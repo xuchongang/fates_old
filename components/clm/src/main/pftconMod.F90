@@ -223,6 +223,25 @@ module pftconMod
      real(r8), allocatable :: pftpar30      (:)   ! min growing degree days (>= 5 deg C)
      real(r8), allocatable :: pftpar31      (:)   ! upper limit of temperature of the warmest month (twmax)
 
+     ! pft parameters for ED Photosynthesis
+     real(r8), allocatable :: vcmaxha       (:)   ! vcmax temperature response factor ha
+     real(r8), allocatable :: jmaxha        (:)   ! jmax temperature response factor ha
+     real(r8), allocatable :: tpuha         (:)   ! tpu temperature response factor ha
+     real(r8), allocatable :: lmrha         (:)   ! respiration temperature response factor ha
+     
+     real(r8), allocatable :: vcmaxhd      (:)   ! vcmax temperature response factor hd
+     real(r8), allocatable :: jmaxhd        (:)   ! jmax temperature response factor hd
+     real(r8), allocatable :: tpuhd         (:)   ! tpu temperature response factor hd
+     real(r8), allocatable :: lmrhd         (:)   ! respiration temperature response factor hd
+     
+     real(r8), allocatable :: vcmaxse       (:)   ! vcmax temperature response factor se
+     real(r8), allocatable :: jmaxse        (:)   ! jmax temperature response factor se
+     real(r8), allocatable :: tpuse         (:)   ! tpu temperature response factor se
+     real(r8), allocatable :: lmrse         (:)   ! respiration temperature response factor se
+    
+     real(r8), allocatable :: lmr25top      (:)   ! leaf maintenance respiration rate at 25C at the top
+
+     
    contains
 
      procedure, public  :: Init
@@ -377,6 +396,21 @@ contains
     allocate( this%pftpar29      (0:mxpft) )   
     allocate( this%pftpar30      (0:mxpft) )   
     allocate( this%pftpar31      (0:mxpft) )   
+
+    allocate( this%vcmaxha       (0:mxpft) )   
+    allocate( this%jmaxha        (0:mxpft) )   
+    allocate( this%tpuha         (0:mxpft) )   
+    allocate( this%lmrha         (0:mxpft) ) 
+    allocate( this%vcmaxhd       (0:mxpft) )   
+    allocate( this%jmaxhd        (0:mxpft) )   
+    allocate( this%tpuhd         (0:mxpft) )   
+    allocate( this%lmrhd         (0:mxpft) ) 
+    allocate( this%vcmaxse       (0:mxpft) )   
+    allocate( this%jmaxse        (0:mxpft) )   
+    allocate( this%tpuse         (0:mxpft) )   
+    allocate( this%lmrse         (0:mxpft) ) 
+
+    allocate( this%lmr25top      (0:mxpft) )
 
   end subroutine InitAllocate
 
@@ -768,7 +802,7 @@ contains
     call ncd_io('mxmat', this%mxmat, 'read', ncid, readvar=readv)  
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
 
-    call ncd_io('cc_leaf', this% cc_leaf, 'read', ncid, readvar=readv)  
+    call ncd_io('cc_leaf', this%cc_leaf, 'read', ncid, readvar=readv)  
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
 
     call ncd_io('cc_lstem', this%cc_lstem, 'read', ncid, readvar=readv)  
@@ -780,7 +814,7 @@ contains
     call ncd_io('cc_other', this%cc_other, 'read', ncid, readvar=readv)  
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
 
-    call ncd_io('fm_leaf', this% fm_leaf, 'read', ncid, readvar=readv)  
+    call ncd_io('fm_leaf', this%fm_leaf, 'read', ncid, readvar=readv)  
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
 
     call ncd_io('fm_lstem', this%fm_lstem, 'read', ncid, readvar=readv)  
@@ -824,6 +858,48 @@ contains
 
     call ncd_io('max_SH_planting_date', this%mxSHplantdate, 'read', ncid, readvar=readv)  
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+
+    call ncd_io('vcmaxha', this%vcmaxha, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('jmaxha', this%jmaxha, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('tpuha', this% tpuha, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('lmrha', this%lmrha, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('vcmaxhd', this%vcmaxhd, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('jmaxhd', this%jmaxhd, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('tpuhd', this%  tpuhd, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('lmrhd', this%lmrhd, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('vcmaxse', this%vcmaxse, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('jmaxse', this%jmaxse, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('tpuse', this%tpuse, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('lmrse', this%lmrse, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+    call ncd_io('lmr25top', this%lmr25top, 'read', ncid, readvar=readv)  
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(__FILE__, __LINE__))
+
+
 
     !
     ! Constants

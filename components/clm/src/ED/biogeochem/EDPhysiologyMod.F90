@@ -237,7 +237,7 @@ contains
   end subroutine trim_canopy
 
   ! ============================================================================
-  subroutine phenology( currentSite, ed_phenology_inst, temperature_inst, waterstate_inst)
+  subroutine phenology( currentSite, ed_phenology_inst, temperature_inst, waterstate_inst , cohort_in)
     !
     ! !DESCRIPTION:
     ! Phenology. 
@@ -253,6 +253,7 @@ contains
     type(ed_phenology_type) , intent(in)            :: ed_phenology_inst
     type(temperature_type)  , intent(in)            :: temperature_inst
     type(waterstate_type)   , intent(in)            :: waterstate_inst
+    type(ed_cohort_type)    , intent(in)            :: cohort_in
     !
     ! !LOCAL VARIABLES:
     real(r8), pointer :: t_veg24(:) 
@@ -272,15 +273,24 @@ contains
     integer  :: sec                      ! seconds of the day
 
     real(r8) :: gdd_threshold
-    real(r8) :: a,b,c        ! params of leaf-pn model from botta et al. 2000. 
-    real(r8) :: cold_t       ! threshold below which cold days are counted 
-    real(r8) :: coldday      ! definition of a 'chilling day' for botta model 
-    real(r8) :: ncdstart     ! beginning of counting period for growing degree days.
+    real(r8) :: a,b,c                      ! params of leaf-pn model from botta et al. 2000. 
+    real(r8) :: cold_t                     ! threshold below which cold days are counted 
+    real(r8) :: coldday                    ! definition of a 'chilling day' for botta model 
+    real(r8) :: ncdstart                   ! beginning of counting period for growing degree days.
     real(r8) :: drought_threshold
-    real(r8) :: off_time     ! minimum number of days between leaf off and leaf on for drought phenology 
-    real(r8) :: temp_in_C    ! daily averaged temperature in celcius
+    real(r8) :: off_time                   ! minimum number of days between leaf off and leaf on for drought phenology 
+    real(r8) :: temp_in_C                  ! daily averaged temperature in celcius
     real(r8) :: mindayson 
     real(r8) :: modelday
+    real(r8) :: ed_ph_drought_threshold    ! soil moisture leads to leaf drop for drought decidious PFT
+    real(r8) :: ed_ph_a                    ! phenology parameter a
+    real(r8) :: ed_ph_b                    ! phenology parameter b
+    real(r8) :: ed_ph_c                    ! phenology parameter c
+    real(r8) :: ed_ph_chiltemp             ! chilling day temperature
+    real(r8) :: ed_ph_coldtemp             ! cold day tempeture (for leaf drop)
+    real(r8) :: ed_ph_ncolddayslim         ! number of cold days for leave drop off
+    real(r8) :: ed_ph_mindayson            ! minimum number of days before leaf drops for cold phenology
+    real(r8) :: ed_ph_doff_time            ! minimum number of days between leaf off and leaf on for drought phenology
 
     !------------------------------------------------------------------------
 
@@ -302,20 +312,20 @@ contains
 
     ! Parameter of drought decid leaf loss in mm in top layer...FIX(RF,032414) 
     ! - this is arbitrary and poorly understood. Needs work. ED_
-    drought_threshold = 0.15 
-    off_time = 100.0_r8
+    drought_threshold = EDecophyscon%ed_ph_drought_threshold(cohort_in%pft)   ! 0.15 
+    off_time = EDecophyscon%ed_ph_doff_time(cohort_in%pft)                    ! 100.0_r8
 
     !Parameters of Botta et al. 2000 GCB,6 709-725 
-    a = -68.0_r8
-    b = 638.0_r8
-    c = -0.001_r8
-    coldday = 5.0_r8    !ed_ph_chiltemp
+    a = EDecophyscon%ed_ph_a(cohort_in%pft)                                   ! -68.0_r8
+    b = EDecophyscon%ed_ph_b(cohort_in%pft)                                   ! 638.0_r8
+    c = EDecophyscon%ed_ph_c(cohort_in%pft)                                   ! -0.001_r8
+    coldday = EDecophyscon%ed_ph_chiltemp(cohort_in%pft)                      ! 5.0_r8    
 
-    mindayson = 30
+    mindayson = EDecophyscon%ed_ph_mindayson(cohort_in%pft)                   ! 30
      
     !Parameters from SDGVM model of senesence
-    ncolddayslim = 5
-    cold_t   = 7.5_r8  ! ed_ph_coldtemp
+    ncolddayslim = EDecophyscon%ed_ph_ncolddayslim(cohort_in%pft)             ! 5
+    cold_t   = EDecophyscon%ed_ph_coldtemp(cohort_in%pft)                     ! 7.5_r8  
 
     t  = udata%time_period
     temp_in_C = t_veg24(currentSite%oldest_patch%clm_pno-1) - tfrz

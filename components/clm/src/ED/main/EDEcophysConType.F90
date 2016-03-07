@@ -38,6 +38,33 @@ module EDEcophysConType
      real(r8), pointer :: clone_alloc        (:) ! fraction of carbon balance allocated to clonal reproduction. 
      real(r8), pointer :: seed_alloc         (:) ! fraction of carbon balance allocated to seeds. 
      real(r8), pointer :: sapwood_ratio      (:) ! amount of sapwood per unit leaf carbon and m height 
+     
+     real(r8), pointer :: dbh2h_m            (:) ! allocation parameter m from dbh to height 
+     real(r8), pointer :: dbh2h_c            (:) ! allocation parameter c from dbh to height 
+     real(r8), pointer :: dbh2bl_a           (:) ! allocation parameter a from dbh to height  
+     real(r8), pointer :: dbh2bl_b           (:) ! allocation parameter b from dbh to height  
+     real(r8), pointer :: dbh2bl_c           (:) ! allocation parameter c from dbh to height  
+     real(r8), pointer :: dbh2bl_slascaler   (:) ! allocation parameter slascaler from dbh to height 
+     real(r8), pointer :: sai_scaler         (:) ! coef that links bdead to sai
+     real(r8), pointer :: dbh2bd_a           (:) ! allocation parameter a from dbh to bdead 
+     real(r8), pointer :: dbh2bd_b           (:) ! allocation parameter b from dbh to bdead  
+     real(r8), pointer :: dbh2bd_c           (:) ! allocation parameter c from dbh to bdead  
+     real(r8), pointer :: dbh2bd_d           (:) ! allocation parameter d from dbh to bdead 
+     
+     real(r8), pointer :: b_mort             (:) ! mortality rate 
+     real(r8), pointer :: hf_sm_threshold    (:) ! hydraulic failure soil moisture threshold
+
+     real(r8), pointer :: ed_ph_drought_threshold (:) ! soil moisture leads to leaf drop for drought decidious PFT
+     real(r8), pointer :: ed_ph_a            (:) ! phenology parameter a 
+     real(r8), pointer :: ed_ph_b            (:) ! phenology parameter b  
+     real(r8), pointer :: ed_ph_c            (:) ! phenology parameter c  
+     real(r8), pointer :: ed_ph_chiltemp     (:) ! chilling day temperature 
+     real(r8), pointer :: ed_ph_coldtemp     (:) ! cold day tempeture (for leaf drop)
+     real(r8), pointer :: ed_ph_ncolddayslim (:) ! number of cold days for leave drop off
+     real(r8), pointer :: ed_ph_mindayson    (:) ! minimum number of days before leaf drops for cold phenology 
+     real(r8), pointer :: ed_ph_doff_time    (:) ! minimum number of days between leaf off and leaf on for drought phenology  
+
+     
   end type EDecophyscon_type
 
   type(EDecophyscon_type), public :: EDecophyscon ! ED ecophysiological constants structure
@@ -81,6 +108,31 @@ contains
     allocate( EDecophyscon%clone_alloc        (0:numpft)); EDecophyscon%clone_alloc        (:) = nan              
     allocate( EDecophyscon%sapwood_ratio      (0:numpft)); EDecophyscon%sapwood_ratio      (:) = nan            
 
+
+    allocate( EDecophyscon%dbh2h_m            (0:numpft)); EDecophyscon%dbh2h_m            (:) = nan
+    allocate( EDecophyscon%dbh2h_c            (0:numpft)); EDecophyscon%dbh2h_c            (:) = nan
+    allocate( EDecophyscon%dbh2bl_a           (0:numpft)); EDecophyscon%dbh2bl_a           (:) = nan           
+    allocate( EDecophyscon%dbh2bl_b           (0:numpft)); EDecophyscon%dbh2bl_b           (:) = nan             
+    allocate( EDecophyscon%dbh2bl_c           (0:numpft)); EDecophyscon%dbh2bl_c           (:) = nan                
+    allocate( EDecophyscon%dbh2bl_slascaler   (0:numpft)); EDecophyscon%dbh2bl_slascaler   (:) = nan                
+    allocate( EDecophyscon%dbh2bd_a           (0:numpft)); EDecophyscon%dbh2bd_a           (:) = nan     
+    allocate( EDecophyscon%dbh2bd_b           (0:numpft)); EDecophyscon%dbh2bd_b           (:) = nan           
+    allocate( EDecophyscon%dbh2bd_c           (0:numpft)); EDecophyscon%dbh2bd_c           (:) = nan             
+    allocate( EDecophyscon%dbh2bd_d           (0:numpft)); EDecophyscon%dbh2bd_d           (:) = nan   
+    allocate( EDecophyscon%sai_scaler         (0:numpft)); EDecophyscon%sai_scaler         (:) = nan                   
+    allocate( EDecophyscon%b_mort             (0:numpft)); EDecophyscon%b_mort             (:) = nan                  
+    allocate( EDecophyscon%hf_sm_threshold    (0:numpft)); EDecophyscon%hf_sm_threshold    (:) = nan            
+    allocate( EDecophyscon%ed_ph_drought_threshold (0:numpft)); EDecophyscon%ed_ph_drought_threshold (:) = nan             
+    allocate( EDecophyscon%ed_ph_a            (0:numpft)); EDecophyscon%ed_ph_a            (:) = nan                  
+    allocate( EDecophyscon%ed_ph_b            (0:numpft)); EDecophyscon%ed_ph_b            (:) = nan                
+    allocate( EDecophyscon%ed_ph_c            (0:numpft)); EDecophyscon%ed_ph_c            (:) = nan              
+    allocate( EDecophyscon%ed_ph_chiltemp     (0:numpft)); EDecophyscon%ed_ph_chiltemp     (:) = nan               
+    allocate( EDecophyscon%ed_ph_coldtemp     (0:numpft)); EDecophyscon%ed_ph_coldtemp     (:) = nan                
+    allocate( EDecophyscon%ed_ph_ncolddayslim (0:numpft)); EDecophyscon%ed_ph_ncolddayslim (:) = nan               
+    allocate( EDecophyscon%ed_ph_mindayson    (0:numpft)); EDecophyscon%ed_ph_mindayson    (:) = nan              
+    allocate( EDecophyscon%ed_ph_doff_time    (0:numpft)); EDecophyscon%ed_ph_doff_time    (:) = nan  
+
+
     do m = 0,numpft
        EDecophyscon%max_dbh(m)               = EDPftvarcon_inst%max_dbh(m)
        EDecophyscon%freezetol(m)             = EDPftvarcon_inst%freezetol(m)
@@ -103,7 +155,30 @@ contains
        EDecophyscon%seed_alloc(m)            = EDPftvarcon_inst%seed_alloc(m)
        EDecophyscon%clone_alloc(m)           = EDPftvarcon_inst%clone_alloc(m)
        EDecophyscon%sapwood_ratio(m)         = EDPftvarcon_inst%sapwood_ratio(m)
-    end do
+       
+       EDecophyscon%dbh2h_m(m)               = EDPftvarcon_inst%dbh2h_m(m)
+       EDecophyscon%dbh2h_c(m)               = EDPftvarcon_inst%dbh2h_c(m)
+       EDecophyscon%dbh2bl_a(m)              = EDPftvarcon_inst%dbh2bl_a(m)
+       EDecophyscon%dbh2bl_b(m)              = EDPftvarcon_inst%dbh2bl_b(m)
+       EDecophyscon%dbh2bl_c(m)              = EDPftvarcon_inst%dbh2bl_c(m)
+       EDecophyscon%dbh2bl_slascaler(m)      = EDPftvarcon_inst%dbh2bl_slascaler(m)
+       EDecophyscon%dbh2bd_a(m)              = EDPftvarcon_inst%dbh2bd_a(m)
+       EDecophyscon%dbh2bd_b(m)              = EDPftvarcon_inst%dbh2bd_b(m)
+       EDecophyscon%dbh2bd_c(m)              = EDPftvarcon_inst%dbh2bd_c(m)
+       EDecophyscon%dbh2bd_d(m)              = EDPftvarcon_inst%dbh2bd_d(m)
+       EDecophyscon%sai_scaler(m)            = EDPftvarcon_inst%sai_scaler(m)        
+       EDecophyscon%b_mort(m)                = EDPftvarcon_inst%b_mort(m)
+       EDecophyscon%hf_sm_threshold(m)       = EDPftvarcon_inst%hf_sm_threshold(m)
+       EDecophyscon%ed_ph_a(m)               = EDPftvarcon_inst%ed_ph_a(m)
+       EDecophyscon%ed_ph_b(m)               = EDPftvarcon_inst%ed_ph_b(m)
+       EDecophyscon%ed_ph_c(m)               = EDPftvarcon_inst%ed_ph_c(m)
+       EDecophyscon%ed_ph_chiltemp(m)        = EDPftvarcon_inst%ed_ph_chiltemp(m)
+       EDecophyscon%ed_ph_coldtemp(m)        = EDPftvarcon_inst%ed_ph_coldtemp(m)
+       EDecophyscon%ed_ph_ncolddayslim(m)    = EDPftvarcon_inst%ed_ph_ncolddayslim(m)
+       EDecophyscon%ed_ph_mindayson(m)       = EDPftvarcon_inst%ed_ph_mindayson(m)
+       EDecophyscon%ed_ph_doff_time(m)       = EDPftvarcon_inst%ed_ph_doff_time(m)
+           
+   end do
 
   end subroutine EDecophysconInit
 

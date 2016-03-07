@@ -38,7 +38,34 @@ module EDPftvarcon
      real(r8) :: clone_alloc        (0:mxpft) ! fraction of carbon balance allocated to clonal reproduction.
      real(r8) :: seed_alloc         (0:mxpft) ! fraction of carbon balance allocated to seeds.
      real(r8) :: sapwood_ratio      (0:mxpft) ! amount of sapwood per unit leaf carbon and m of height. gC/gC/m
+     
      real(r8) :: dbh2h_m            (0:mxpft) ! allocation parameter m from dbh to height
+     real(r8) :: dbh2h_c            (0:mxpft) ! allocation parameter c from dbh to height
+     real(r8) :: dbh2bl_a           (0:mxpft) ! allocation parameter a from dbh to bleaf     
+     real(r8) :: dbh2bl_b           (0:mxpft) ! allocation parameter b from dbh to bleaf
+     real(r8) :: dbh2bl_c           (0:mxpft) ! allocation parameter c from dbh to bleaf
+     real(r8) :: dbh2bl_slascaler   (0:mxpft) ! allocation parameter slascaler from dbh to bleaf
+     real(r8) :: dbh2bd_a           (0:mxpft) ! allocation parameter a from dbh to bdead  
+     real(r8) :: dbh2bd_b           (0:mxpft) ! allocation parameter b from dbh to bdead  
+     real(r8) :: dbh2bd_c           (0:mxpft) ! allocation parameter c from dbh to bdead  
+     real(r8) :: dbh2bd_d           (0:mxpft) ! allocation parameter d from dbh to bdead        
+     real(r8) :: sai_scaler         (0:mxpft) ! coef that links bdead to sai   
+     
+     real(r8) :: b_mort             (0:mxpft) ! mortality rate 
+     real(r8) :: hf_sm_threshold    (0:mxpft) ! hydraulic failure soil moisture threshold 
+
+     real(r8) :: ed_ph_drought_threshold  (0:mxpft) ! soil moisture leads to leaf drop for drought decidious PFT
+     real(r8) :: ed_ph_a            (0:mxpft) ! phenology parameter a 
+     real(r8) :: ed_ph_b            (0:mxpft) ! phenology parameter b  
+     real(r8) :: ed_ph_c            (0:mxpft) ! phenology parameter c  
+     real(r8) :: ed_ph_chiltemp     (0:mxpft) ! chilling day temperature 
+     real(r8) :: ed_ph_coldtemp     (0:mxpft) ! cold day tempeture (for leaf drop)
+     real(r8) :: ed_ph_ncolddayslim (0:mxpft) ! number of cold days for leave drop off
+     real(r8) :: ed_ph_mindayson    (0:mxpft) ! minimum number of days before leaf drops for cold phenology 
+     real(r8) :: ed_ph_doff_time    (0:mxpft) ! minimum number of days between leaf off and leaf on for drought phenology  
+     
+     
+          
   end type EDPftvarcon_type
 
   type(EDPftvarcon_type), public :: EDPftvarcon_inst
@@ -135,7 +162,73 @@ contains
     
     call ncd_io('dbh2h_m',EDPftvarcon_inst%dbh2h_m, 'read', ncid,  readvar=readv)
     if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2h_c',EDPftvarcon_inst%dbh2h_c, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bl_a',EDPftvarcon_inst%dbh2bl_a, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bl_b',EDPftvarcon_inst%dbh2bl_b, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bl_c',EDPftvarcon_inst%dbh2bl_c, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bl_slascaler',EDPftvarcon_inst%dbh2bl_slascaler, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bd_a',EDPftvarcon_inst%dbh2bd_a, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bd_b',EDPftvarcon_inst%dbh2bd_b, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bd_c',EDPftvarcon_inst%dbh2bd_c, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('dbh2bd_d',EDPftvarcon_inst%dbh2bd_d, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')  
+    
+    call ncd_io('sai_scaler',EDPftvarcon_inst%sai_scaler, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')  
+    
+    call ncd_io('b_mort',EDPftvarcon_inst%b_mort, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')
+    
+    call ncd_io('hf_sm_threshold',EDPftvarcon_inst%hf_sm_threshold, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_drought_threshold',EDPftvarcon_inst%ed_ph_drought_threshold, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_a',EDPftvarcon_inst%ed_ph_a, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_b',EDPftvarcon_inst%ed_ph_b, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_c',EDPftvarcon_inst%ed_ph_c, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_chiltemp',EDPftvarcon_inst%ed_ph_chiltemp, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_coldtemp',EDPftvarcon_inst%ed_ph_coldtemp, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_ncolddayslim',EDPftvarcon_inst%ed_ph_ncolddayslim, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_mindayson',EDPftvarcon_inst%ed_ph_mindayson, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
+    
+    call ncd_io('ed_ph_doff_time',EDPftvarcon_inst%ed_ph_doff_time, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
 
+  
+        
+    
   end subroutine EDpftconrd
 
 end module EDPftvarcon

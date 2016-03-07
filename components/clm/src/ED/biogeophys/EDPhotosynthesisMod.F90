@@ -21,7 +21,7 @@ contains
   !---------------------------------------------------------
   subroutine Photosynthesis_ED (bounds, fn, filterp, esat_tv, eair, oair, cair, &
        rb, dayl_factor, ed_allsites_inst, &
-       atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst)
+       atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst , cohort_in)
     !
     ! !DESCRIPTION:
     ! Leaf photosynthesis and stomatal conductance calculation as described by
@@ -66,6 +66,7 @@ contains
     type(temperature_type) , intent(in)            :: temperature_inst
     type(canopystate_type) , intent(inout)         :: canopystate_inst
     type(photosyns_type)   , intent(inout)         :: photosyns_inst
+    type(ed_cohort_type)   , intent(inout)         :: cohort_in
     !
     ! !CALLED FROM:
     ! subroutine CanopyFluxes 
@@ -271,24 +272,24 @@ contains
       kcha    = 79430._r8
       koha    = 36380._r8
       cpha    = 37830._r8
-      vcmaxha = 65330._r8
-      jmaxha  = 43540._r8
-      tpuha   = 53100._r8
-      lmrha   = 46390._r8
+      vcmaxha = pftcon%vcmaxha(cohort_in%pft)   ! 65330._r8
+      jmaxha  = pftcon%jmaxha(cohort_in%pft)    ! 43540._r8
+      tpuha   = pftcon%tpuha(cohort_in%pft)     ! 53100._r8
+      lmrha   = pftcon%lmrha(cohort_in%pft)     ! 46390._r8
 
       ! High temperature deactivation, from:
       ! Leuning (2002) Plant, Cell and Environment 25:1205-1210
       ! The factor "c" scales the deactivation to a value of 1.0 at 25C
 
-      vcmaxhd = 149250._r8
-      jmaxhd  = 152040._r8
-      tpuhd   = 150650._r8
-      lmrhd   = 150650._r8
+      vcmaxhd = pftcon%vcmaxhd(cohort_in%pft)   ! 149250._r8
+      jmaxhd  = pftcon%jmaxhd(cohort_in%pft)    ! 152040._r8
+      tpuhd   = pftcon%tpuhd(cohort_in%pft)     ! 150650._r8
+      lmrhd   = pftcon%lmrhd(cohort_in%pft)     ! 150650._r8
 
-      vcmaxse = 485._r8
-      jmaxse  = 495._r8
-      tpuse   = 490._r8
-      lmrse   = 490._r8
+      vcmaxse = pftcon%vcmaxse(cohort_in%pft)   ! 485._r8
+      jmaxse  = pftcon%jmaxse(cohort_in%pft)    ! 495._r8
+      tpuse   = pftcon%tpuse(cohort_in%pft)     ! 490._r8
+      lmrse   = pftcon%lmrse(cohort_in%pft)     ! 490._r8
 
       vcmaxc = fth25(vcmaxhd, vcmaxse)
       jmaxc  = fth25(jmaxhd, jmaxse)
@@ -469,8 +470,10 @@ contains
                !
                ! Then scale this value at the top of the canopy for canopy depth
                
-               lmr25top(FT) = 2.525e-6_r8 * (1.5_r8 ** ((25._r8 - 20._r8)/10._r8))
-               lmr25top(FT) = lmr25top(FT) * lnc(FT) / 12.e-06_r8
+               !lmr25top(FT) = 2.525e-6_r8 * (1.5_r8 ** ((25._r8 - 20._r8)/10._r8))
+               !lmr25top(FT) = lmr25top(FT) * lnc(FT) / 12.e-06_r8
+	       
+	       lmr25top(FT)= pftcon%lmr25top(FT)
 
             end do !FT 
 

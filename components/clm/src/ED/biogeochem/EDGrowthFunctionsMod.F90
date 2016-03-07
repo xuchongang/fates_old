@@ -48,8 +48,8 @@ contains
     real(r8) :: m !parameter of allometric equation (needs to not be hardwired...
     real(r8) :: c !parameter of allometric equation (needs to not be hardwired...
 
-    m = 0.64_r8
-    c = 0.37_r8
+    m = EDecophyscon%dbh2h_m(cohort_in%pft)   !0.64_r8
+    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8
 
     dbh = (10.0_r8**((log10(cohort_in%hite) - c)/m))
 
@@ -72,8 +72,8 @@ contains
     real(r8) :: c
     real(r8) :: h
 
-    m = 0.64_r8
-    c = 0.37_r8       
+    m = EDecophyscon%dbh2h_m(cohort_in%pft)   !0.64_r8
+    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8       
 
     if(cohort_in%dbh <= 0._r8)then
        write(iulog,*) 'ED: dbh less than zero problem!',cohort_in%indexnumber
@@ -97,24 +97,35 @@ contains
 ! ============================================================================
 
   real(r8) function Bleaf( cohort_in )
-
+  
+    type(ed_cohort_type), intent(inout) :: cohort_in
+    ! type(ed_cohort_type), intent(in)    :: cohort_in       
+    
+    real(r8) :: dbh2bl_a 
+    real(r8) :: dbh2bl_b
+    real(r8) :: dbh2bl_c
+    real(r8) :: slascaler ! changes the target biomass according to the SLA
+    
+    dbh2bl_a =  EDecophyscon%dbh2bl_a(cohort_in%pft)
+    dbh2bl_b =  EDecophyscon%dbh2bl_b(cohort_in%pft)
+    dbh2bl_c =  EDecophyscon%dbh2bl_c(cohort_in%pft)
+    slascaler = EDecophyscon%dbh2bl_slascaler(cohort_in%pft)/pftcon%slatop(cohort_in%pft) ! 0.03_r8/pftcon%slatop(cohort_in%pft)
+    
+    
     ! ============================================================================
     !  Creates leaf biomass (kGC) as a function of tree diameter.  
     ! ============================================================================
-
-    type(ed_cohort_type), intent(in) :: cohort_in       
-    real(r8) :: slascaler ! changes the target biomass according to the SLA
 
     if(cohort_in%dbh < 0._r8.or.cohort_in%pft == 0.or.cohort_in%dbh > 1000.0_r8)then
        write(iulog,*) 'problems in bleaf',cohort_in%dbh,cohort_in%pft
     endif
 
     if(cohort_in%dbh <= EDecophyscon%max_dbh(cohort_in%pft))then
-       bleaf = 0.0419_r8 * (cohort_in%dbh**1.56) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8
+       bleaf = dbh2bl_a * (cohort_in%dbh**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c ! 0.0419_r8 * (cohort_in%dbh**1.56) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8
     else  
-       bleaf = 0.0419_r8 * (EDecophyscon%max_dbh(cohort_in%pft)**1.56) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8      
-    endif  
-    slascaler = 0.03_r8/pftcon%slatop(cohort_in%pft)
+       bleaf = dbh2bl_a * (EDecophyscon%max_dbh(cohort_in%pft)**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c      
+    endif 
+
     bleaf = bleaf * slascaler
     
     !write(*,*) 'bleaf',bleaf, slascaler,cohort_in%pft
@@ -183,7 +194,7 @@ contains
     real(r8) :: sai_scaler     ! This is hardwired, but should be made a parameter  - 
              ! I need to add a new parameter to the 'standard' parameter file but don't have permission... RF 2 july.    
 
-    sai_scaler = 0.05_r8 ! here, a high biomass of 20KgC per m2 gives us a high SAI of 1.0. 
+    sai_scaler = EDecophyscon%sai_scaler(cohort_in%pft)              ! 0.05_r8 ! here, a high biomass of 20KgC per m2 gives us a high SAI of 1.0. 
 
     if( cohort_in%bdead  <  0._r8 .or. cohort_in%pft  ==  0 ) then
        write(iulog,*) 'problem in treesai',cohort_in%bdead,cohort_in%pft
@@ -251,11 +262,23 @@ contains
     ! using allometry of J.G. Saldarriaga et al 1988 - Rio Negro                                  
     ! Journal of Ecology vol 76 p938-958                                       
     ! ============================================================================
-
+    
     type(ed_cohort_type), intent(in) :: cohort_in       
+    
+    real(r8) :: dbh2bd_a
+    real(r8) :: dbh2bd_b
+    real(r8) :: dbh2bd_c
+    real(r8) :: dbh2bd_d
+    
+    dbh2bd_a =  EDecophyscon%dbh2bd_a(cohort_in%pft)
+    dbh2bd_b =  EDecophyscon%dbh2bd_b(cohort_in%pft)
+    dbh2bd_c =  EDecophyscon%dbh2bd_c(cohort_in%pft)  
+    dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
 
-    bdead = 0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* &
-         (EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+    bdead =  dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c)* &
+         (EDecophyscon%wood_density(cohort_in%pft)** dbh2bd_d)    
+	 !  0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* & 
+	 !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
 
   end function Bdead
 
@@ -271,9 +294,22 @@ contains
     type(ed_cohort_type), intent(in)  :: cohort_in
 
     real(r8) :: dbddh ! rate of change of dead biomass (KgC) per unit change of height (m) 
+    
+    real(r8) :: dbh2bd_a
+    real(r8) :: dbh2bd_b
+    real(r8) :: dbh2bd_c
+    real(r8) :: dbh2bd_d
+    
+    dbh2bd_a =  EDecophyscon%dbh2bd_a(cohort_in%pft)
+    dbh2bd_b =  EDecophyscon%dbh2bd_b(cohort_in%pft)
+    dbh2bd_c =  EDecophyscon%dbh2bd_c(cohort_in%pft)  
+    dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
 
-    dbddh = 0.06896_r8*0.572_r8*(cohort_in%hite**(-0.428_r8))*(cohort_in%dbh**1.94_r8)* &
-         (EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+    dbddh =  dbh2bd_a*dbh2bd_b*(cohort_in%hite**(dbh2bd_b-1.0_r8))*(cohort_in%dbh**dbh2bd_c)* &
+         (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d) 
+	 ! 0.06896_r8*0.572_r8*(cohort_in%hite**(0.572_r8-1.0_r8))*(cohort_in%dbh**1.94_r8)* &
+         !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+    
     dHdBd = 1.0_r8/dbddh !m/KgC 
 
     return
@@ -291,17 +327,38 @@ contains
     type(ed_cohort_type), intent(in) :: cohort_in
 
     real(r8) :: dBD_dDBH !Rate of change of dead biomass (KgC) with change in DBH (cm) 
-    real(r8) :: dH_dDBH  !Rate of change of height (m) with change in DBH (cm) 
-
-    dBD_dDBH = 1.94_r8*0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**0.94_r8)* &
-         (EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+    real(r8) :: dH_dDBH  !Rate of change of height (m) with change in DBH (cm)
+    
+    real(r8) :: m
+    real(r8) :: c
+    real(r8) :: h
+    real(r8) :: dbh2bd_a
+    real(r8) :: dbh2bd_b
+    real(r8) :: dbh2bd_c
+    real(r8) :: dbh2bd_d
+        
+    m = EDecophyscon%dbh2h_m(cohort_in%pft)   !0.64_r8
+    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8  
+    
+    dbh2bd_a =  EDecophyscon%dbh2bd_a(cohort_in%pft)
+    dbh2bd_b =  EDecophyscon%dbh2bd_b(cohort_in%pft)
+    dbh2bd_c =  EDecophyscon%dbh2bd_c(cohort_in%pft)  
+    dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
+  
+    dBD_dDBH = dbh2bd_c*dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c-1.0_r8)* &
+               (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d) 
+	      !1.94_r8*0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**0.94_r8)* &
+              !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8) 
+    
     if(cohort_in%dbh < EDecophyscon%max_dbh(cohort_in%pft))then
-       dH_dDBH = 1.4976_r8*(cohort_in%dbh**(-0.36_r8))
-       dBD_dDBH = dBD_dDBH + 0.572_r8*0.06896_r8*(cohort_in%hite**(0.572_r8 - 1.0_r8))* &
-            (cohort_in%dbh**1.94_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)*dH_dDBH
+       dH_dDBH = (10.0_r8**c)*m*(cohort_in%dbh**(m-1.0_r8))          !1.4976_r8*(cohort_in%dbh**(-0.36_r8))
+       dBD_dDBH = dBD_dDBH + dbh2bd_b*dbh2bd_a*(cohort_in%hite**(dbh2bd_b - 1.0_r8))* &
+               (cohort_in%dbh**dbh2bd_c)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d)*dH_dDBH  
+	       !dBD_dDBH + 0.572_r8*0.06896_r8*(cohort_in%hite**(0.572_r8 - 1.0_r8))* &
+               !(cohort_in%dbh**1.94_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)*dH_dDBH
     endif
 
-    dDbhdBd = 1.0/dBD_dDBH
+    dDbhdBd = 1.0_r8/dBD_dDBH
 
     return
 
@@ -319,7 +376,17 @@ contains
 
     real(r8) :: dblddbh ! Rate of change of leaf biomass with change in DBH
 
-    dblddbh = 1.56_r8*0.0419_r8*(cohort_in%dbh**0.56_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.55_r8)
+    real(r8) :: dbh2bl_a
+    real(r8) :: dbh2bl_b
+    real(r8) :: dbh2bl_c
+    
+    dbh2bl_a =  EDecophyscon%dbh2bl_a(cohort_in%pft)
+    dbh2bl_b =  EDecophyscon%dbh2bl_b(cohort_in%pft)
+    dbh2bl_c =  EDecophyscon%dbh2bl_c(cohort_in%pft)  
+
+    dblddbh = dbh2bl_b*dbh2bl_a*(cohort_in%dbh**dbh2bl_b)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c)  
+             !1.56_r8*0.0419_r8*(cohort_in%dbh**0.56_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.55_r8)
+    
     dblddbh = dblddbh*cohort_in%canopy_trim
 
     if( cohort_in%dbh<EDecophyscon%max_dbh(cohort_in%pft) ) then
@@ -334,7 +401,7 @@ contains
 
 ! ============================================================================
 
-  subroutine mortality_rates( cohort_in,cmort,hmort,bmort )
+  subroutine mortality_rates( cohort_in,cmort,hmort , bmort ) ! ,b_mort  , Bleaf
 
     ! ============================================================================
     !  Calculate mortality rates as a function of carbon storage       
@@ -342,18 +409,20 @@ contains
 
     use EDParamsMod,  only : ED_val_stress_mort
 
-    type (ed_cohort_type), intent(in) :: cohort_in
+    type (ed_cohort_type), intent(inout) :: cohort_in
     real(r8),intent(out) :: bmort ! background mortality : Fraction per year
     real(r8),intent(out) :: cmort  ! carbon starvation mortality
     real(r8),intent(out) :: hmort  ! hydraulic failure mortality
 
     real(r8) :: frac  ! relativised stored carbohydrate
-
+    real(r8) :: hf_sm_threshold    ! hydraulic failure soil moisture threshold 
+    
     ! 'Background' mortality (can vary as a function of density as in ED1.0 and ED2.0, but doesn't here for tractability) 
     bmort = EDecophyscon%b_mort(cohort_in%pft) !0.014_r8 
+    hf_sm_threshold = EDecophyscon%hf_sm_threshold(cohort_in%pft)
    
     ! Proxy for hydraulic failure induced mortality. 
-    if(cohort_in%patchptr%btran_ft(cohort_in%pft) <= 0.000001_r8)then 
+    if(cohort_in%patchptr%btran_ft(cohort_in%pft) <= hf_sm_threshold)then 
        hmort = ED_val_stress_mort
      else
        hmort = 0.0_r8

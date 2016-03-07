@@ -47,10 +47,11 @@ module CanopyFluxesMod
   use GridcellType          , only : grc                
   use ColumnType            , only : col                
   use PatchType             , only : patch                
-  use EDTypesMod            , only : ed_site_type
+  use EDTypesMod            , only : ed_site_type,  ed_cohort_type
   use SoilWaterRetentionCurveMod, only : soil_water_retention_curve_type
   use CNVegNitrogenStateType, only : cnveg_nitrogenstate_type
   use LunaMod               , only : Update_Photosynthesis_Capacity, Acc24_Climate_LUNA,Acc240_Climate_LUNA,Clear24_Climate_LUNA
+  
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -79,7 +80,7 @@ contains
        ed_allsites_inst,  atm2lnd_inst, canopystate_inst, cnveg_state_inst,            &
        energyflux_inst, frictionvel_inst, soilstate_inst, solarabs_inst, surfalb_inst, &
        temperature_inst, waterflux_inst, waterstate_inst, ch4_inst, ozone_inst, photosyns_inst, &
-       humanindex_inst, soil_water_retention_curve, cnveg_nitrogenstate_inst) 
+       humanindex_inst, soil_water_retention_curve, cnveg_nitrogenstate_inst , cohort_in) 
     !
     ! !DESCRIPTION:
     ! 1. Calculates the leaf temperature:
@@ -145,6 +146,7 @@ contains
     type(humanindex_type)                  , intent(inout)         :: humanindex_inst
     class(soil_water_retention_curve_type) , intent(in)            :: soil_water_retention_curve
     type(cnveg_nitrogenstate_type)         , intent(in)            :: cnveg_nitrogenstate_inst
+    type(ed_cohort_type)                   , intent(inout)         :: cohort_in
     !
     ! !LOCAL VARIABLES:
     real(r8), parameter :: btran0 = 0.0_r8  ! initial value
@@ -742,7 +744,7 @@ contains
             call Photosynthesis_ED (bounds, fn, filterp, &
                  svpts(begp:endp), eah(begp:endp), o2(begp:endp), &
                  co2(begp:endp), rb(begp:endp), dayl_factor(begp:endp), &
-                 ed_allsites_inst(begg:endg), atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst)
+                 ed_allsites_inst(begg:endg), atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst , cohort_in)
 
             ! zero all of these things, not just the ones in the filter. 
             do p = bounds%begp,bounds%endp 

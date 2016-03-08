@@ -142,7 +142,7 @@ contains
     integer              :: ier                     ! error code
     type(bounds_type)    :: bounds_clump    
     type(bounds_type)    :: bounds_proc     
-    type(ed_cohort_type) :: cohort_in
+   
     
     ! COMPILER_BUG(wjs, 2014-11-29, pgi 14.7) Workaround for internal compiler error with
     ! pgi 14.7 ('normalize_forall_array: non-conformable'), which appears in the call to
@@ -342,7 +342,7 @@ contains
             filter(nc)%num_nolakec, filter(nc)%nolakec, &
             filter(nc)%num_nolakep, filter(nc)%nolakep, &
             filter(nc)%num_soilp  , filter(nc)%soilp,   &
-            canopystate_inst, waterstate_inst, waterflux_inst, energyflux_inst , cohort_in)
+            canopystate_inst, waterstate_inst, waterflux_inst, energyflux_inst)
 
        call downscale_forcings(bounds_clump, &
             filter(nc)%num_do_smb_c, filter(nc)%do_smb_c, &
@@ -443,7 +443,7 @@ contains
             atm2lnd_inst, canopystate_inst, cnveg_state_inst,                               &
             energyflux_inst, frictionvel_inst, soilstate_inst, solarabs_inst, surfalb_inst, &
             temperature_inst, waterflux_inst, waterstate_inst, ch4_inst, ozone_inst, photosyns_inst, &
-            humanindex_inst, soil_water_retention_curve, cnveg_nitrogenstate_inst , cohort_in) 
+            humanindex_inst, soil_water_retention_curve, cnveg_nitrogenstate_inst) 
        call t_stopf('canflux')
 
        ! Fluxes for all urban landunits
@@ -1029,7 +1029,7 @@ contains
                ed_allsites_inst(bounds_clump%begg:bounds_clump%endg), &
                ed_clm_inst, ed_phenology_inst,                        &
                atm2lnd_inst, soilstate_inst, temperature_inst,        &
-               waterstate_inst, canopystate_inst , cohort_in)
+               waterstate_inst, canopystate_inst)
 
           ! 
           ! TODO(SPM, 012715) - see note XIX above regarding hbuf updates 
@@ -1109,7 +1109,7 @@ contains
        num_nolakec, filter_nolakec, &
        num_nolakep, filter_nolakep, &
        num_soilp  , filter_soilp, &
-       canopystate_inst, waterstate_inst, waterflux_inst, energyflux_inst , cohort_in)
+       canopystate_inst, waterstate_inst, waterflux_inst, energyflux_inst)
     !
     ! !DESCRIPTION:
     ! Initialization of clm driver variables needed from previous timestep
@@ -1138,7 +1138,6 @@ contains
     type(waterstate_type) , intent(inout) :: waterstate_inst
     type(waterflux_type)  , intent(inout) :: waterflux_inst
     type(energyflux_type) , intent(inout) :: energyflux_inst
-    type(ed_cohort_type)  , intent(inout) :: cohort_in
     !
     ! !LOCAL VARIABLES:
     integer :: l, c, p, f, j         ! indices

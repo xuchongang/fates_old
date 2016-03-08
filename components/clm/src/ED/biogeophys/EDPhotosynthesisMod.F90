@@ -21,7 +21,7 @@ contains
   !---------------------------------------------------------
   subroutine Photosynthesis_ED (bounds, fn, filterp, esat_tv, eair, oair, cair, &
        rb, dayl_factor, ed_allsites_inst, &
-       atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst , cohort_in)
+       atm2lnd_inst, temperature_inst, canopystate_inst, photosyns_inst)
     !
     ! !DESCRIPTION:
     ! Leaf photosynthesis and stomatal conductance calculation as described by
@@ -66,7 +66,6 @@ contains
     type(temperature_type) , intent(in)            :: temperature_inst
     type(canopystate_type) , intent(inout)         :: canopystate_inst
     type(photosyns_type)   , intent(inout)         :: photosyns_inst
-    type(ed_cohort_type)   , intent(inout)         :: cohort_in
     !
     ! !CALLED FROM:
     ! subroutine CanopyFluxes 
@@ -272,29 +271,7 @@ contains
       kcha    = 79430._r8
       koha    = 36380._r8
       cpha    = 37830._r8
-      vcmaxha = pftcon%vcmaxha(cohort_in%pft)   ! 65330._r8
-      jmaxha  = pftcon%jmaxha(cohort_in%pft)    ! 43540._r8
-      tpuha   = pftcon%tpuha(cohort_in%pft)     ! 53100._r8
-      lmrha   = pftcon%lmrha(cohort_in%pft)     ! 46390._r8
-
-      ! High temperature deactivation, from:
-      ! Leuning (2002) Plant, Cell and Environment 25:1205-1210
-      ! The factor "c" scales the deactivation to a value of 1.0 at 25C
-
-      vcmaxhd = pftcon%vcmaxhd(cohort_in%pft)   ! 149250._r8
-      jmaxhd  = pftcon%jmaxhd(cohort_in%pft)    ! 152040._r8
-      tpuhd   = pftcon%tpuhd(cohort_in%pft)     ! 150650._r8
-      lmrhd   = pftcon%lmrhd(cohort_in%pft)     ! 150650._r8
-
-      vcmaxse = pftcon%vcmaxse(cohort_in%pft)   ! 485._r8
-      jmaxse  = pftcon%jmaxse(cohort_in%pft)    ! 495._r8
-      tpuse   = pftcon%tpuse(cohort_in%pft)     ! 490._r8
-      lmrse   = pftcon%lmrse(cohort_in%pft)     ! 490._r8
-
-      vcmaxc = fth25(vcmaxhd, vcmaxse)
-      jmaxc  = fth25(jmaxhd, jmaxse)
-      tpuc   = fth25(tpuhd, tpuse)
-      lmrc   = fth25(lmrhd, lmrse)
+  
 
       ! Miscellaneous parameters, from Bonan et al (2011) JGR, 116, doi:10.1029/2010JG001593
 
@@ -443,6 +420,30 @@ contains
 	       jmax25top(FT) = 1.67_r8   * vcmax25top(FT)
 	       tpu25top(FT)  = 0.167_r8  * vcmax25top(FT)
 	       kp25top(FT)   = 20000._r8 * vcmax25top(FT)
+	       
+	       vcmaxha = pftcon%vcmaxha(FT)   ! 65330._r8
+               jmaxha  = pftcon%jmaxha(FT)    ! 43540._r8
+               tpuha   = pftcon%tpuha(FT)     ! 53100._r8
+               lmrha   = pftcon%lmrha(FT)     ! 46390._r8
+
+              ! High temperature deactivation, from:
+              ! Leuning (2002) Plant, Cell and Environment 25:1205-1210
+              ! The factor "c" scales the deactivation to a value of 1.0 at 25C
+
+               vcmaxhd = pftcon%vcmaxhd(FT)   ! 149250._r8
+               jmaxhd  = pftcon%jmaxhd(FT)    ! 152040._r8
+               tpuhd   = pftcon%tpuhd(FT)     ! 150650._r8
+               lmrhd   = pftcon%lmrhd(FT)     ! 150650._r8
+
+               vcmaxse = pftcon%vcmaxse(FT)   ! 485._r8
+               jmaxse  = pftcon%jmaxse(FT)    ! 495._r8
+               tpuse   = pftcon%tpuse(FT)     ! 490._r8
+               lmrse   = pftcon%lmrse(FT)     ! 490._r8
+
+               vcmaxc = fth25(vcmaxhd, vcmaxse)
+               jmaxc  = fth25(jmaxhd, jmaxse)
+               tpuc   = fth25(tpuhd, tpuse)
+               lmrc   = fth25(lmrhd, lmrse)
 
                ! Nitrogen scaling factor. Bonan et al (2011) JGR, 116, doi:10.1029/2010JG001593 used
                ! kn = 0.11. Here, derive kn from vcmax25 as in Lloyd et al (2010) Biogeosciences, 7, 1833-1859

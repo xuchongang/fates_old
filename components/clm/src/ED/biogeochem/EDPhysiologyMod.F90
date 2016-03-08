@@ -237,7 +237,7 @@ contains
   end subroutine trim_canopy
 
   ! ============================================================================
-  subroutine phenology( currentSite, ed_phenology_inst, temperature_inst, waterstate_inst , cohort_in)
+  subroutine phenology( currentSite, ed_phenology_inst, temperature_inst, waterstate_inst)
     !
     ! !DESCRIPTION:
     ! Phenology. 
@@ -253,7 +253,6 @@ contains
     type(ed_phenology_type) , intent(in)            :: ed_phenology_inst
     type(temperature_type)  , intent(in)            :: temperature_inst
     type(waterstate_type)   , intent(in)            :: waterstate_inst
-    type(ed_cohort_type)    , intent(in)            :: cohort_in
     !
     ! !LOCAL VARIABLES:
     real(r8), pointer :: t_veg24(:) 
@@ -312,20 +311,20 @@ contains
 
     ! Parameter of drought decid leaf loss in mm in top layer...FIX(RF,032414) 
     ! - this is arbitrary and poorly understood. Needs work. ED_
-    drought_threshold = EDecophyscon%ed_ph_drought_threshold(cohort_in%pft)   ! 0.15 
-    off_time = EDecophyscon%ed_ph_doff_time(cohort_in%pft)                    ! 100.0_r8
+    drought_threshold = EDecophyscon%ed_ph_drought_threshold                  ! 0.15 
+    off_time = EDecophyscon%ed_ph_doff_time                                   ! 100.0_r8
 
     !Parameters of Botta et al. 2000 GCB,6 709-725 
-    a = EDecophyscon%ed_ph_a(cohort_in%pft)                                   ! -68.0_r8
-    b = EDecophyscon%ed_ph_b(cohort_in%pft)                                   ! 638.0_r8
-    c = EDecophyscon%ed_ph_c(cohort_in%pft)                                   ! -0.001_r8
-    coldday = EDecophyscon%ed_ph_chiltemp(cohort_in%pft)                      ! 5.0_r8    
+    a = EDecophyscon%ed_ph_a                                                  ! -68.0_r8
+    b = EDecophyscon%ed_ph_b                                                  ! 638.0_r8
+    c = EDecophyscon%ed_ph_c                                                  ! -0.001_r8
+    coldday = EDecophyscon%ed_ph_chiltemp                                     ! 5.0_r8    
 
-    mindayson = EDecophyscon%ed_ph_mindayson(cohort_in%pft)                   ! 30
+    mindayson = EDecophyscon%ed_ph_mindayson                                  ! 30
      
     !Parameters from SDGVM model of senesence
-    ncolddayslim = EDecophyscon%ed_ph_ncolddayslim(cohort_in%pft)             ! 5
-    cold_t   = EDecophyscon%ed_ph_coldtemp(cohort_in%pft)                     ! 7.5_r8  
+    ncolddayslim = EDecophyscon%ed_ph_ncolddayslim                            ! 5
+    cold_t   = EDecophyscon%ed_ph_coldtemp                                    ! 7.5_r8  
 
     t  = udata%time_period
     temp_in_C = t_veg24(currentSite%oldest_patch%clm_pno-1) - tfrz

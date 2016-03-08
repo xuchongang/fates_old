@@ -98,8 +98,7 @@ contains
 
   real(r8) function Bleaf( cohort_in )
   
-    type(ed_cohort_type), intent(inout) :: cohort_in
-    ! type(ed_cohort_type), intent(in)    :: cohort_in       
+    type(ed_cohort_type), intent(in)    :: cohort_in       
     
     real(r8) :: dbh2bl_a 
     real(r8) :: dbh2bl_b
@@ -277,7 +276,7 @@ contains
 
     bdead =  dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c)* &
          (EDecophyscon%wood_density(cohort_in%pft)** dbh2bd_d)    
-	 !  0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* & 
+    	 !  0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* & 
 	 !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
 
   end function Bdead
@@ -409,7 +408,7 @@ contains
 
     use EDParamsMod,  only : ED_val_stress_mort
 
-    type (ed_cohort_type), intent(inout) :: cohort_in
+    type (ed_cohort_type), intent(in) :: cohort_in
     real(r8),intent(out) :: bmort ! background mortality : Fraction per year
     real(r8),intent(out) :: cmort  ! carbon starvation mortality
     real(r8),intent(out) :: hmort  ! hydraulic failure mortality

@@ -43,7 +43,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine ed_driver( bounds, ed_allsites_inst, ed_clm_inst, ed_phenology_inst, &
-       atm2lnd_inst, soilstate_inst, temperature_inst, waterstate_inst, canopystate_inst , cohort_in)
+       atm2lnd_inst, soilstate_inst, temperature_inst, waterstate_inst, canopystate_inst)
     !
     ! !DESCRIPTION:
     ! Main ed model routine containing gridcell loop   
@@ -63,7 +63,6 @@ contains
     type(temperature_type)  , intent(in)            :: temperature_inst
     type(waterstate_type)   , intent(inout)         :: waterstate_inst
     type(canopystate_type)  , intent(inout)         :: canopystate_inst
-    type(ed_cohort_type)    , intent(inout)         :: cohort_in
     !
     ! !LOCAL VARIABLES:
     type(ed_site_type), pointer :: currentSite
@@ -103,7 +102,7 @@ contains
           currentSite => ed_allsites_inst(g)
           call ed_ecosystem_dynamics(currentSite, &
                ed_clm_inst, ed_phenology_inst, atm2lnd_inst, &
-               soilstate_inst, temperature_inst, waterstate_inst , cohort_in)
+               soilstate_inst, temperature_inst, waterstate_inst)
 
           call ed_update_site( ed_allsites_inst(g))
        endif
@@ -122,7 +121,7 @@ contains
   !-------------------------------------------------------------------------------!
   subroutine ed_ecosystem_dynamics(currentSite, &
        ed_clm_inst, ed_phenology_inst, atm2lnd_inst, &
-       soilstate_inst, temperature_inst, waterstate_inst , cohort_in)
+       soilstate_inst, temperature_inst, waterstate_inst)
     !
     ! !DESCRIPTION:
     !  Core of ed model, calling all subsequent vegetation dynamics routines         
@@ -135,7 +134,6 @@ contains
     type(soilstate_type)    , intent(in)             :: soilstate_inst
     type(temperature_type)  , intent(in)             :: temperature_inst
     type(waterstate_type)   , intent(in)             :: waterstate_inst
-    type(ed_cohort_type)    , intent(in)             :: cohort_in
     
     !
     ! !LOCAL VARIABLES:
@@ -151,7 +149,7 @@ contains
    
     call ed_total_balance_check(currentSite, 0)
     
-    call phenology(currentSite, ed_phenology_inst, temperature_inst, waterstate_inst , cohort_in)
+    call phenology(currentSite, ed_phenology_inst, temperature_inst, waterstate_inst)
 
     call fire_model(currentSite, atm2lnd_inst, temperature_inst)
 

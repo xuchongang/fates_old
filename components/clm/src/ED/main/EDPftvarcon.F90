@@ -54,15 +54,15 @@ module EDPftvarcon
      real(r8) :: b_mort             (0:mxpft) ! mortality rate 
      real(r8) :: hf_sm_threshold    (0:mxpft) ! hydraulic failure soil moisture threshold 
 
-     real(r8) :: ed_ph_drought_threshold  (0:mxpft) ! soil moisture leads to leaf drop for drought decidious PFT
-     real(r8) :: ed_ph_a            (0:mxpft) ! phenology parameter a 
-     real(r8) :: ed_ph_b            (0:mxpft) ! phenology parameter b  
-     real(r8) :: ed_ph_c            (0:mxpft) ! phenology parameter c  
-     real(r8) :: ed_ph_chiltemp     (0:mxpft) ! chilling day temperature 
-     real(r8) :: ed_ph_coldtemp     (0:mxpft) ! cold day tempeture (for leaf drop)
-     real(r8) :: ed_ph_ncolddayslim (0:mxpft) ! number of cold days for leave drop off
-     real(r8) :: ed_ph_mindayson    (0:mxpft) ! minimum number of days before leaf drops for cold phenology 
-     real(r8) :: ed_ph_doff_time    (0:mxpft) ! minimum number of days between leaf off and leaf on for drought phenology  
+     real(r8) :: ed_ph_drought_threshold      ! soil moisture leads to leaf drop for drought decidious PFT
+     real(r8) :: ed_ph_a                      ! phenology parameter a 
+     real(r8) :: ed_ph_b                      ! phenology parameter b  
+     real(r8) :: ed_ph_c                      ! phenology parameter c  
+     real(r8) :: ed_ph_chiltemp               ! chilling day temperature 
+     real(r8) :: ed_ph_coldtemp               ! cold day tempeture (for leaf drop)
+     real(r8) :: ed_ph_ncolddayslim           ! number of cold days for leave drop off
+     real(r8) :: ed_ph_mindayson              ! minimum number of days before leaf drops for cold phenology 
+     real(r8) :: ed_ph_doff_time              ! minimum number of days between leaf off and leaf on for drought phenology  
      
      
           

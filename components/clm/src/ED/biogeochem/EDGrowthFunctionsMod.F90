@@ -73,8 +73,8 @@ contains
     real(r8) :: h
 
     m = EDecophyscon%dbh2h_m(cohort_in%pft)   !0.64_r8
-    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8       
-
+    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8
+ 
     if(cohort_in%dbh <= 0._r8)then
        write(iulog,*) 'ED: dbh less than zero problem!',cohort_in%indexnumber
        cohort_in%dbh = 0.1_r8
@@ -120,9 +120,11 @@ contains
     endif
 
     if(cohort_in%dbh <= EDecophyscon%max_dbh(cohort_in%pft))then
-       bleaf = dbh2bl_a * (cohort_in%dbh**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c ! 0.0419_r8 * (cohort_in%dbh**1.56) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8
+       bleaf = dbh2bl_a * (cohort_in%dbh**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c 
+       ! bleaf = 0.0419_r8 * (cohort_in%dbh**1.56) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8
     else  
-       bleaf = dbh2bl_a * (EDecophyscon%max_dbh(cohort_in%pft)**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c      
+       bleaf = dbh2bl_a * (EDecophyscon%max_dbh(cohort_in%pft)**dbh2bl_b) * EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c  
+       ! bleaf =  0.0419_r8  * (EDecophyscon%max_dbh(cohort_in%pft)**1.56_r8) * EDecophyscon%wood_density(cohort_in%pft)**0.55_r8    
     endif 
 
     bleaf = bleaf * slascaler
@@ -274,9 +276,9 @@ contains
     dbh2bd_c =  EDecophyscon%dbh2bd_c(cohort_in%pft)  
     dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
 
-    bdead =  dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c)* &
-         (EDecophyscon%wood_density(cohort_in%pft)** dbh2bd_d)    
-    	 !  0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* & 
+    bdead = dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c)* &
+         (EDecophyscon%wood_density(cohort_in%pft)** dbh2bd_d)  
+	! 0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**1.94_r8)* & 
 	 !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
 
   end function Bdead
@@ -305,9 +307,10 @@ contains
     dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
 
     dbddh =  dbh2bd_a*dbh2bd_b*(cohort_in%hite**(dbh2bd_b-1.0_r8))*(cohort_in%dbh**dbh2bd_c)* &
-         (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d) 
-	 ! 0.06896_r8*0.572_r8*(cohort_in%hite**(0.572_r8-1.0_r8))*(cohort_in%dbh**1.94_r8)* &
-         !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+         (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d)
+           !  0.06896_r8*0.572_r8*(cohort_in%hite**(0.572_r8-1.0_r8))*(cohort_in%dbh**1.94_r8)* &
+         !   (EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)
+
     
     dHdBd = 1.0_r8/dbddh !m/KgC 
 
@@ -337,24 +340,30 @@ contains
     real(r8) :: dbh2bd_d
         
     m = EDecophyscon%dbh2h_m(cohort_in%pft)   !0.64_r8
-    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8  
+    c = EDecophyscon%dbh2h_c(cohort_in%pft)   !0.37_r8
     
     dbh2bd_a =  EDecophyscon%dbh2bd_a(cohort_in%pft)
     dbh2bd_b =  EDecophyscon%dbh2bd_b(cohort_in%pft)
     dbh2bd_c =  EDecophyscon%dbh2bd_c(cohort_in%pft)  
     dbh2bd_d =  EDecophyscon%dbh2bd_d(cohort_in%pft)
   
-    dBD_dDBH = dbh2bd_c*dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**dbh2bd_c-1.0_r8)* &
-               (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d) 
-	      !1.94_r8*0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**0.94_r8)* &
-              !(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8) 
-    
+    dBD_dDBH =  dbh2bd_c*dbh2bd_a*(cohort_in%hite**dbh2bd_b)*(cohort_in%dbh**(dbh2bd_c-1.0_r8))* &
+               (EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d)  	
+              ! 1.94_r8*0.06896_r8*(cohort_in%hite**0.572_r8)*(cohort_in%dbh**0.94_r8)* &
+              ! (EDecophyscon%wood_density(cohort_in%pft)**0.931_r8) 
+
+ 
     if(cohort_in%dbh < EDecophyscon%max_dbh(cohort_in%pft))then
-       dH_dDBH = (10.0_r8**c)*m*(cohort_in%dbh**(m-1.0_r8))          !1.4976_r8*(cohort_in%dbh**(-0.36_r8))
-       dBD_dDBH = dBD_dDBH + dbh2bd_b*dbh2bd_a*(cohort_in%hite**(dbh2bd_b - 1.0_r8))* &
-               (cohort_in%dbh**dbh2bd_c)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d)*dH_dDBH  
-	       !dBD_dDBH + 0.572_r8*0.06896_r8*(cohort_in%hite**(0.572_r8 - 1.0_r8))* &
-               !(cohort_in%dbh**1.94_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)*dH_dDBH
+       dH_dDBH = (10.0_r8**c)*m*(cohort_in%dbh**(m-1.0_r8))          
+              ! 1.4976_r8*(cohort_in%dbh**(-0.36_r8))
+       
+       	 
+       dBD_dDBH =  dBD_dDBH + dbh2bd_b*dbh2bd_a*(cohort_in%hite**(dbh2bd_b - 1.0_r8))* &
+                  (cohort_in%dbh**dbh2bd_c)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bd_d)*dH_dDBH 
+              ! dBD_dDBH + 0.572_r8*0.06896_r8*(cohort_in%hite**(0.572_r8 - 1.0_r8))* &
+              !  (cohort_in%dbh**1.94_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.931_r8)*dH_dDBH
+
+            
     endif
 
     dDbhdBd = 1.0_r8/dBD_dDBH
@@ -383,8 +392,9 @@ contains
     dbh2bl_b =  EDecophyscon%dbh2bl_b(cohort_in%pft)
     dbh2bl_c =  EDecophyscon%dbh2bl_c(cohort_in%pft)  
 
-    dblddbh = dbh2bl_b*dbh2bl_a*(cohort_in%dbh**dbh2bl_b)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c)  
-             !1.56_r8*0.0419_r8*(cohort_in%dbh**0.56_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.55_r8)
+    dblddbh = dbh2bl_b*dbh2bl_a*(cohort_in%dbh**dbh2bl_b)*(EDecophyscon%wood_density(cohort_in%pft)**dbh2bl_c)
+            !  1.56_r8*0.0419_r8*(cohort_in%dbh**0.56_r8)*(EDecophyscon%wood_density(cohort_in%pft)**0.55_r8)
+	       
     
     dblddbh = dblddbh*cohort_in%canopy_trim
 
@@ -418,7 +428,9 @@ contains
     
     ! 'Background' mortality (can vary as a function of density as in ED1.0 and ED2.0, but doesn't here for tractability) 
 
-    bmort = EDecophyscon%b_mort(cohort_in%pft) !0.014_r8 
+    bmort = EDecophyscon%b_mort(cohort_in%pft) 
+       !0.014_r8
+        
     hf_sm_threshold = EDecophyscon%hf_sm_threshold(cohort_in%pft)
    
     ! Proxy for hydraulic failure induced mortality. 

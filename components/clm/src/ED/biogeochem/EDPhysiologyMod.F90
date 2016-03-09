@@ -290,6 +290,7 @@ contains
     real(r8) :: ed_ph_ncolddayslim         ! number of cold days for leave drop off
     real(r8) :: ed_ph_mindayson            ! minimum number of days before leaf drops for cold phenology
     real(r8) :: ed_ph_doff_time            ! minimum number of days between leaf off and leaf on for drought phenology
+    real(r8) :: seed_turnover              ! complete seed turnover rate
 
     !------------------------------------------------------------------------
 
@@ -680,7 +681,8 @@ contains
     real(r8) :: seed_turnover !complete seed turnover rate in yr-1. 
     !----------------------------------------------------------------------
 
-    seed_turnover = 0.51_r8  ! from Liscke and Loffler 2006  
+    seed_turnover = EDecophyscon%seed_turnover      !   0.51_r8  ! from Liscke and Loffler 2006  
+    
     ! decays the seed pool according to exponential model
     ! sd_mort is in yr-1
     do p = 1,numpft_ed 

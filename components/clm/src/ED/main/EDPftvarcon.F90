@@ -64,7 +64,7 @@ module EDPftvarcon
      real(r8) :: ed_ph_mindayson              ! minimum number of days before leaf drops for cold phenology 
      real(r8) :: ed_ph_doff_time              ! minimum number of days between leaf off and leaf on for drought phenology  
      real(r8) :: seed_turnover                ! complete seed turnover rate
-     
+     real(r8) :: germination_timescale        ! seed germination timescale in yr-1
           
   end type EDPftvarcon_type
 
@@ -228,7 +228,9 @@ contains
      
     call ncd_io('seed_turnover',EDPftvarcon_inst%seed_turnover, 'read', ncid,  readvar=readv)
     if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')   
-        
+
+    call ncd_io('germination_timescale',EDPftvarcon_inst%germination_timescale, 'read', ncid,  readvar=readv)
+    if   ( .not. readv) call endrun(trim(subname)// ' ERROR : error in reading in pft data')         
     
   end subroutine EDpftconrd
 

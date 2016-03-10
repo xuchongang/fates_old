@@ -291,6 +291,7 @@ contains
     real(r8) :: ed_ph_mindayson            ! minimum number of days before leaf drops for cold phenology
     real(r8) :: ed_ph_doff_time            ! minimum number of days between leaf off and leaf on for drought phenology
     real(r8) :: seed_turnover              ! complete seed turnover rate
+    real(r8) :: germination_timescale      ! seed germination timescale in yr-1
 
     !------------------------------------------------------------------------
 
@@ -708,10 +709,10 @@ contains
     real(r8) germination_timescale !yr-1
     !----------------------------------------------------------------------
 
-    germination_timescale = 0.5_r8 !this is arbitrary
+    germination_timescale = EDecophyscon%germination_timescale   ! 0.5_r8 !this is arbitrary
     max_germination = 1.0_r8 !this is arbitrary
 
-    do p = 1,numpft_ed
+    do p = 1,numpft_ed 
        currentPatch%seed_germination(p) =  min(currentPatch%seed_bank(p) * germination_timescale,max_germination)
     enddo
 

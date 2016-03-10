@@ -63,8 +63,9 @@ module EDEcophysConType
      real(r8) :: ed_ph_ncolddayslim              ! number of cold days for leave drop off
      real(r8) :: ed_ph_mindayson                 ! minimum number of days before leaf drops for cold phenology 
      real(r8) :: ed_ph_doff_time                 ! minimum number of days between leaf off and leaf on for drought phenology  
-     real(r8) :: seed_turnover                   ! minimum number of days between leaf off and leaf on for drought phenology
-     
+     real(r8) :: seed_turnover                   ! complete seed turnover rate in yr-1
+     real(r8) :: germination_timescale           ! seed germination timescale in yr-1
+      
   end type EDecophyscon_type
 
   type(EDecophyscon_type), public :: EDecophyscon ! ED ecophysiological constants structure
@@ -163,7 +164,8 @@ contains
        EDecophyscon%hf_sm_threshold(m)       = EDPftvarcon_inst%hf_sm_threshold(m)
            
    end do
-         
+       
+   ! Define phenology parameters outside of loop, because they have only one value  [EM March 2016]      
    EDecophyscon%ed_ph_a                      = EDPftvarcon_inst%ed_ph_a 
    EDecophyscon%ed_ph_b                      = EDPftvarcon_inst%ed_ph_b 
    EDecophyscon%ed_ph_c                      = EDPftvarcon_inst%ed_ph_c 
@@ -173,6 +175,7 @@ contains
    EDecophyscon%ed_ph_mindayson              = EDPftvarcon_inst%ed_ph_mindayson 
    EDecophyscon%ed_ph_doff_time              = EDPftvarcon_inst%ed_ph_doff_time 
    EDecophyscon%seed_turnover                = EDPftvarcon_inst%seed_turnover 
+   EDecophyscon%germination_timescale        = EDPftvarcon_inst%germination_timescale 
    
   end subroutine EDecophysconInit
 

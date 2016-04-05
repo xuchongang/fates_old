@@ -890,10 +890,10 @@ contains
                             if (abs(error)  >  0.15_r8)then
                                write(iulog,*) 'Large Dir Radn consvn error',error ,p,ib
                                write(iulog,*) 'diags',albd(p,ib),ftdd(p,ib),ftid(p,ib),fabd(p,ib)
-                               write(iulog,*) 'lai_change',lai_change(currentpatch%ncl_p,1:2,1:4)
-                               write(iulog,*) 'elai',currentpatch%elai_profile(currentpatch%ncl_p,1:2,1:4)
-                               write(iulog,*) 'esai',currentpatch%esai_profile(currentpatch%ncl_p,1:2,1:4)
-                               write(iulog,*) 'ftweight',ftweight(1,1:2,1:4)
+                               ! write(iulog,*) 'lai_change',lai_change(currentpatch%ncl_p,1:2,1:4)
+                               ! write(iulog,*) 'elai',currentpatch%elai_profile(currentpatch%ncl_p,1:2,1:4)
+                               ! write(iulog,*) 'esai',currentpatch%esai_profile(currentpatch%ncl_p,1:2,1:4)
+                               ! write(iulog,*) 'ftweight',ftweight(1,1:2,1:4)
                                write(iulog,*) 'cp',currentPatch%area, currentPatch%patchno
                                write(iulog,*) 'albgrd(c,ib)',albgrd(c,ib)
 

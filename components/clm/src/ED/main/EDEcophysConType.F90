@@ -166,6 +166,7 @@ contains
    end do
        
    ! Define phenology parameters outside of loop, because they have only one value  [EM March 2016]      
+   EDecophyscon%ed_ph_drought_threshold      = EDPftvarcon_inst%ed_ph_drought_threshold
    EDecophyscon%ed_ph_a                      = EDPftvarcon_inst%ed_ph_a 
    EDecophyscon%ed_ph_b                      = EDPftvarcon_inst%ed_ph_b 
    EDecophyscon%ed_ph_c                      = EDPftvarcon_inst%ed_ph_c 

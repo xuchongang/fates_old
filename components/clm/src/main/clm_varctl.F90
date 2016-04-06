@@ -98,7 +98,7 @@ module clm_varctl
   ! Flag to turn on MEGAN VOC's
   !----------------------------------------------------------
 
-  logical, public :: use_voc = .true. 
+  logical, public :: use_voc = .false. 
 
   !----------------------------------------------------------
   ! Interpolation of finidat if requested

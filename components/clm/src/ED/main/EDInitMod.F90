@@ -9,7 +9,7 @@ module EDInitMod
   use decompMod                 , only : bounds_type
   use abortutils                , only : endrun
   use clm_varpar                , only : nclmax
-  use clm_varctl                , only : iulog, use_ed_spit_fire 
+  use clm_varctl                , only : finidat, iulog, use_ed_spit_fire 
   use clm_time_manager          , only : is_restart
   use CanopyStateType           , only : canopystate_type
   use WaterStateType            , only : waterstate_type
@@ -75,7 +75,7 @@ contains
     !
     ! don't call this if we are restarting
     !
-    if ( .not. is_restart() ) then
+    if ( .not. is_restart() .and. finidat == ' ') then
        call ed_init_sites( bounds, ed_allsites_inst(bounds%begg:bounds%endg))
 
        do g = bounds%begg,bounds%endg

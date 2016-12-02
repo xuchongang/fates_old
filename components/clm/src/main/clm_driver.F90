@@ -603,7 +603,7 @@ contains
             filter(nc)%num_snowc, filter(nc)%snowc,                          &
             filter(nc)%num_nosnowc, filter(nc)%nosnowc,                      &
             atm2lnd_inst, soilstate_inst, energyflux_inst, temperature_inst,   &
-            waterflux_inst, waterstate_inst, soilhydrology_inst, aerosol_inst, &
+            waterflux_inst, waterstate_inst, irrigation_inst, soilhydrology_inst, aerosol_inst, &  !BOC..added for irrigation_inst for Chonggang
             soil_water_retention_curve)
 
        !  Calculate column-integrated aerosol masses, and

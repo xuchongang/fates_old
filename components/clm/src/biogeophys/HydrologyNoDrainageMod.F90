@@ -39,6 +39,7 @@ contains
        num_nosnowc, filter_nosnowc, &
        atm2lnd_inst, soilstate_inst, energyflux_inst, temperature_inst, &
        waterflux_inst, waterstate_inst, &
+       irrigation_inst, &                         !BOC...added for Chonggang irrigation
        soilhydrology_inst, aerosol_inst, &
        soil_water_retention_curve)
     !
@@ -69,6 +70,7 @@ contains
     use SoilHydrologyMod     , only : CLMVICMap, SurfaceRunoff, Infiltration, WaterTable
     use SoilWaterMovementMod , only : SoilWater 
     use SoilWaterRetentionCurveMod, only : soil_water_retention_curve_type
+    use IrrigationMod        , only : irrigation_type   !BOC... for Chonggang irrigation
     !
     ! !ARGUMENTS:
     type(bounds_type)        , intent(in)    :: bounds               
@@ -89,6 +91,7 @@ contains
     type(waterflux_type)     , intent(inout) :: waterflux_inst
     type(waterstate_type)    , intent(inout) :: waterstate_inst
     type(aerosol_type)       , intent(inout) :: aerosol_inst
+    type(irrigation_type)    , intent(inout) :: irrigation_inst      ! BOC...added for Chonggang irrigation
     type(soilhydrology_type) , intent(inout) :: soilhydrology_inst
     class(soil_water_retention_curve_type), intent(in) :: soil_water_retention_curve
     !
@@ -177,7 +180,7 @@ contains
 
       call Infiltration(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc,&
            energyflux_inst, soilhydrology_inst, soilstate_inst, temperature_inst, &
-           waterflux_inst, waterstate_inst)
+           waterflux_inst, waterstate_inst, irrigation_inst) !BOC...added for Chonggang irrigation
 
       call SoilWater(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
             soilhydrology_inst, soilstate_inst, waterflux_inst, waterstate_inst, temperature_inst, &

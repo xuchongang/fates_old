@@ -241,7 +241,7 @@ contains
    !-----------------------------------------------------------------------
    subroutine Infiltration(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
         energyflux_inst, soilhydrology_inst, soilstate_inst, temperature_inst, &
-        waterflux_inst, waterstate_inst)
+        waterflux_inst, waterstate_inst, irrigation_inst)  !BOC... irrigation_inst added for Chonggang irrigation
      !
      ! !DESCRIPTION:
      ! Calculate infiltration into surface soil layer (minus the evaporation)
@@ -254,6 +254,7 @@ contains
      use column_varcon    , only : icol_roof, icol_road_imperv, icol_sunwall, icol_shadewall, icol_road_perv
      use landunit_varcon  , only : istsoil, istcrop
      use clm_time_manager , only : get_step_size
+     use IrrigationMod    , only : irrigation_type   !BOC... for Chonggang irrigation
      !
      ! !ARGUMENTS:
      type(bounds_type)        , intent(in)    :: bounds               
@@ -267,6 +268,7 @@ contains
      type(temperature_type)   , intent(in)    :: temperature_inst
      type(waterstate_type)    , intent(inout) :: waterstate_inst
      type(waterflux_type)     , intent(inout) :: waterflux_inst
+     type(irrigation_type)    , intent(inout) :: irrigation_inst      ! BOC...added for Chonggang irrigation
      !
      ! !LOCAL VARIABLES:
      integer  :: c,j,l,fc                                   ! indices
@@ -332,6 +334,8 @@ contains
           bsw              =>    soilstate_inst%bsw_col              , & ! Input:  [real(r8) (:,:) ]  Clapp and Hornberger "b"                        
           hksat            =>    soilstate_inst%hksat_col            , & ! Input:  [real(r8) (:,:) ]  hydraulic conductivity at saturation (mm H2O /s)
           eff_porosity     =>    soilstate_inst%eff_porosity_col     , & ! Output: [real(r8) (:,:) ]  effective porosity = porosity - vol_ice         
+
+          qflx_irrig       =>    irrigation_inst%qflx_irrig_col      , & ! Input:  [real(r8) (:)   ]  irrigation amount (mm/s)  !BOC...added for Chonggang irrigation
 
           h2osfc_thresh    =>    soilhydrology_inst%h2osfc_thresh_col, & ! Input:  [real(r8) (:)   ]  level at which h2osfc "percolates"                
           zwt              =>    soilhydrology_inst%zwt_col          , & ! Input:  [real(r8) (:)   ]  water table depth (m)                             
@@ -472,6 +476,7 @@ contains
              !7. remove drainage from h2osfc and add to qflx_infl
              h2osfc(c) = h2osfc(c) - qflx_h2osfc_drain(c) * dtime
              qflx_infl(c) = qflx_infl(c) + qflx_h2osfc_drain(c)
+             qflx_irrig(c) = min(qflx_irrig(c), (1.0_r8 - frac_h2osfc(c))*qinmax - qflx_infil(c))  !BOC...limit irrigation to prevent runoff
           else
              ! non-vegetated landunits (i.e. urban) use original CLM4 code
              if (snl(c) >= 0) then

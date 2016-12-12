@@ -23,7 +23,7 @@ module CanopyHydrologyMod
   use TemperatureType , only : temperature_type
   use WaterfluxType   , only : waterflux_type
   use WaterstateType  , only : waterstate_type
-  use IrrigationMod   , only : irrigation_type
+  use IrrigationMod   , only : irrigation_type 
   use ColumnType      , only : col                
   use PatchType       , only : patch                
   !
@@ -242,7 +242,8 @@ contains
           qflx_prec_grnd       => waterflux_inst%qflx_prec_grnd_patch     , & ! Output: [real(r8) (:)   ]  water onto ground including canopy runoff [kg/(m2 s)]
           qflx_rain_grnd       => waterflux_inst%qflx_rain_grnd_patch     , & ! Output: [real(r8) (:)   ]  rain on ground after interception (mm H2O/s) [+]
 
-          qflx_irrig           => irrigation_inst%qflx_irrig_patch        , & ! Input: [real(r8) (:)    ]  irrigation amount (mm/s)           
+          qflx_irrig           => irrigation_inst%qflx_irrig_patch        , & ! Input: [real(r8) (:)    ]  irrigation amount (mm/s)         
+	  is_drip_irrig        => irrigation_inst%params%is_drip_irrig    , & ! for drip irrigation, the water will be applied without runoff 
           qflx_snowindunload   => waterflux_inst%qflx_snowindunload_patch , & ! Output: [real(r8) (:)   ]  canopy snow unloading from wind [mm/s]    
           qflx_snotempunload   => waterflux_inst%qflx_snotempunload_patch   & ! Output: [real(r8) (:)   ]  canopy snow unloading from temp. [mm/s]    
           )
@@ -424,7 +425,11 @@ contains
 
           ! Add irrigation water directly onto ground (bypassing canopy interception)
           ! Note that it's still possible that (some of) this irrigation water will runoff (as runoff is computed later)
-          qflx_prec_grnd_rain(p) = qflx_prec_grnd_rain(p) + qflx_irrig(p)
+	  if(.not.is_drip_irrig)then
+            qflx_prec_grnd_rain(p) = qflx_prec_grnd_rain(p) + qflx_irrig(p)
+	  else
+	    qflx_prec_grnd_rain(p) = qflx_prec_grnd_rain(p)
+	  endif
 
           qflx_prec_grnd(p) = qflx_prec_grnd_snow(p) + qflx_prec_grnd_rain(p)
 

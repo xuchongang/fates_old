@@ -91,21 +91,57 @@
         <MAX_TASKS_PER_NODE>USERDEFINED_required_build</MAX_TASKS_PER_NODE>
 </machine>
 
+<machine MACH="eddi">
+        <DESC>eddi linux PC</DESC>
+        <OS>LINUX</OS>            
+        <COMPILERS>gnu</COMPILERS>
+        <MPILIBS>openmpi,mpi-serial</MPILIBS>
+        <CESMSCRATCHROOT>/home/lbleco/clmed</CESMSCRATCHROOT>
+	<RUNDIR>$CESMSCRATCHROOT/$CASE/run</RUNDIR>
+	<EXEROOT>$CESMSCRATCHROOT/$CASE/bld</EXEROOT>
+	<DIN_LOC_ROOT>$CESMSCRATCHROOT/cesm_input_datasets/</DIN_LOC_ROOT>
+	<DIN_LOC_ROOT_CLMFORC>$DIN_LOC_ROOT/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+	<DOUT_S_ROOT>$CESMSCRATCHROOT/cesm_archive/$CASE</DOUT_S_ROOT>
+	<DOUT_L_MSROOT>csm/$CASE</DOUT_L_MSROOT>
+	<CCSM_BASELINE>$CESMSCRATCHROOT/cesm_baselines</CCSM_BASELINE>
+	<CCSM_CPRNC>$CESMSCRATCHROOT/cesm_tools/cprnc/cprnc</CCSM_CPRNC>
+        <BATCHQUERY>USERDEFINED_optional_run</BATCHQUERY> 
+        <BATCHSUBMIT>USERDEFINED_optional_run</BATCHSUBMIT>
+        <BATCHREDIRECT></BATCHREDIRECT>
+        <SUPPORTED_BY>rgknox-that-weird-a-with-circle-dot-lbl-dot-guvment</SUPPORTED_BY>
+        <GMAKE_J>1</GMAKE_J>
+        <MAX_TASKS_PER_NODE>4</MAX_TASKS_PER_NODE>
+	<batch_system type="none" version="x.y"></batch_system>
+	<mpirun mpilib="mpi-serial">
+	  <executable>mpirun</executable>
+	  <arguments>
+            <arg name="num_tasks">-np {{ num_tasks }}</arg>
+            <arg name="tasks_per_node"> -npernode {{ tasks_per_node }}</arg>
+	  </arguments>
+	</mpirun>
+	<mpirun mpilib="default">
+	  <executable>mpirun</executable>
+	  <arguments>
+            <arg name="num_tasks">-np {{ num_tasks }}</arg>
+            <arg name="tasks_per_node"> -npernode {{ tasks_per_node }}</arg>
+	  </arguments>
+	</mpirun>
+</machine>
+
+
 <machine MACH="wolf">
   <DESC>LANL Linux Cluster, 16 pes/node, batch system Moab</DESC>
-  <NODENAME_REGEX>wolf</NODENAME_REGEX>
-  <TESTS>acme_developer</TESTS>
   <COMPILERS>intel,gnu</COMPILERS>
   <MPILIBS>openmpi,mvapich,mpi-serial</MPILIBS>
   <OS>LINUX</OS>
-  <RUNDIR>/lustre/scratch1/turquoise/$ENV{USER}/ACME/cases/$CASE/run</RUNDIR>
-  <EXEROOT>/lustre/scratch1/turquoise/$ENV{USER}/ACME/cases/$CASE/bld</EXEROOT>
-  <DIN_LOC_ROOT>/lustre/scratch1/turquoise/$ENV{USER}/ACME/input_data</DIN_LOC_ROOT>
-  <DIN_LOC_ROOT_CLMFORC>/lustre/scratch1/turquoise/$ENV{USER}/ACME/input_data/atm/datm7</DIN_LOC_ROOT_CLMFORC>
-  <DOUT_S_ROOT>/lustre/scratch1/turquoise/$ENV{USER}/ACME/archive/$CASE</DOUT_S_ROOT>
+  <RUNDIR>/lustre/scratch3/turquoise/$ENV{USER}/ACME/cases/$CASE/run</RUNDIR>
+  <EXEROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME/cases/$CASE/bld</EXEROOT>
+  <DIN_LOC_ROOT>/usr/projects/cesm/input_data</DIN_LOC_ROOT>
+  <DIN_LOC_ROOT_CLMFORC>/usr/projects/cesm/input_data/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+  <DOUT_S_ROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME/archive/$CASE</DOUT_S_ROOT>
   <DOUT_L_MSROOT>UNSET</DOUT_L_MSROOT>
-  <CCSM_BASELINE>/lustre/scratch1/turquoise/$ENV{USER}/ACME/input_data/ccsm_baselines</CCSM_BASELINE>
-  <CESMSCRATCHROOT>/lustre/scratch1/turquoise/$ENV{USER}/ACME</CESMSCRATCHROOT>
+  <CCSM_BASELINE>/lustre/scratch3/turquoise/$ENV{USER}/ACME/input_data/ccsm_baselines</CCSM_BASELINE>
+  <CESMSCRATCHROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME</CESMSCRATCHROOT>
   <CCSM_CPRNC>/turquoise/usr/projects/climate/SHARED_CLIMATE/software/wolf/cprnc/v0.40/cprnc</CCSM_CPRNC>
   <BATCHQUERY>mshow</BATCHQUERY>
   <BATCHSUBMIT>msub</BATCHSUBMIT>
@@ -193,6 +229,55 @@
   <SUPPORTED_BY>jacobsen.douglas -at- gmail.com</SUPPORTED_BY>
 </machine>
 
+<machine MACH="pinto">
+  <DESC>LANL Linux Cluster, 16 pes/node, batch system Moab</DESC>
+  <COMPILERS>intel,gnu</COMPILERS>
+  <MPILIBS>openmpi,mvapich,mpi-serial</MPILIBS>
+  <OS>LINUX</OS>
+  <RUNDIR>/lustre/scratch3/turquoise/$ENV{USER}/ACME/cases/$CASE/run</RUNDIR>
+  <EXEROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME/cases/$CASE/bld</EXEROOT>
+  <DIN_LOC_ROOT>/usr/projects/cesm/input_data</DIN_LOC_ROOT>
+  <DIN_LOC_ROOT_CLMFORC>/usr/projects/cesm/input_data/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+  <DOUT_S_ROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME/archive/$CASE</DOUT_S_ROOT>
+  <DOUT_L_MSROOT>UNSET</DOUT_L_MSROOT>
+  <CCSM_BASELINE>/usr/projects/cesm/input_data/ccsm_baselines</CCSM_BASELINE>
+  <CESMSCRATCHROOT>/lustre/scratch3/turquoise/$ENV{USER}/ACME</CESMSCRATCHROOT>
+  <CCSM_CPRNC>/turquoise/usr/projects/climate/SHARED_CLIMATE/software/wolf/cprnc/v0.40/cprnc</CCSM_CPRNC>
+  <BATCHQUERY>mshow</BATCHQUERY>
+  <BATCHSUBMIT>msub</BATCHSUBMIT>
+  <BATCHREDIRECT></BATCHREDIRECT>
+  <batch_system type="moab" version="x.y">
+    <walltimes>
+      <walltime default="true">00:30:00</walltime>
+      <walltime ccsm_estcost="1">00:30:00</walltime>
+      <walltime ccsm_estcost="3">00:30:00</walltime>
+      </walltimes>
+    </batch_system>
+  <mpirun mpilib="default">
+    <executable>mpirun</executable>
+    <arguments>
+      <arg name="num_tasks"> -n {{ num_tasks }}</arg>
+      </arguments>
+    </mpirun>
+  <mpirun mpilib="openmpi">
+    <executable>mpirun</executable>
+    <arguments>
+      <arg name="num_tasks"> -n {{ num_tasks }}</arg>
+      </arguments>
+    </mpirun>
+  <mpirun mpilib="mvapich">
+    <executable>srun</executable>
+    <arguments>
+      <arg name="num_tasks"> -n {{ num_tasks }}</arg>
+      </arguments>
+    </mpirun>
+  <mpirun mpilib="mpi-serial">
+    <executable></executable>
+    </mpirun>
+  <GMAKE_J>4</GMAKE_J>
+  <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+  <SUPPORTED_BY>cxu-at- lanl.gov</SUPPORTED_BY>
+</machine>
 
 
 <machine MACH="babbage">

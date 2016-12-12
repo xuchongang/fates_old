@@ -14,7 +14,7 @@ module EDTypesMod
 
   ! MODEL PARAMETERS
   real(r8)            :: timestep_secs                     ! subdaily timestep in seconds (e.g. 1800 or 3600) 
-  integer             :: n_sub                             ! num of substeps in year 
+  
   real(r8), parameter :: AREA                 = 10000.0_r8 ! Notional area of simulated forest m2
   integer  doy
 
@@ -24,9 +24,9 @@ module EDTypesMod
   ! for setting number of patches per gridcell and number of cohorts per patch
   ! for I/O and converting to a vector
 
-  integer, parameter :: numPatchesPerGridCell = 10          !
+  integer, parameter :: numPatchesPerCol      = 10          !
   integer, parameter :: numCohortsPerPatch    = 160         !
-  integer, parameter :: cohorts_per_gcell     = 1600        ! This is the max number of individual items one can store per 
+  integer, parameter :: cohorts_per_col       = 1600        ! This is the max number of individual items one can store per 
 
                                                            ! each grid cell and effects the striding in the ED restart 
                                                            ! data as some fields are arrays where each array is
@@ -105,6 +105,28 @@ module EDTypesMod
                                            ! the parameter array sclass_ed.
   integer , allocatable :: pft_levscpf_ed(:)
   integer , allocatable :: scls_levscpf_ed(:) 
+
+  
+
+  type, private :: ctrl_parms_type
+     
+
+     ! These parameters are dictated by FATES internals
+
+     
+
+
+     ! These parameters are dictated by the host model or driver
+
+     integer :: numSWBands   ! Maximum number of broad-bands in the short-wave radiation
+                             ! specturm to track 
+                             ! (typically 2 as a default, VIS/NIR, in ED variants <2016)
+     
+     integer :: numlevgrnd   ! Number of soil layers
+
+  end type ctrl_parms_type
+  
+  type(ctrl_parms_type), public :: ctrl_parms
 
 
   !************************************
@@ -233,6 +255,8 @@ module EDTypesMod
 
      !INDICES
      integer  :: patchno                                           ! unique number given to each new patch created for tracking
+
+     ! INTERF-TODO: THIS VARIABLE SHOULD BE REMOVED
      integer  :: clm_pno                                           ! clm patch number (index of p vector)
 
      ! PATCH INFO
@@ -298,6 +322,7 @@ module EDTypesMod
      real(r8) :: seed_decay(numpft_ed)                             ! seed decay in KgC/m2/year
      real(r8) :: seed_germination(numpft_ed)                       ! germination rate of seed pool in KgC/m2/year
      real(r8) :: dseed_dt(numpft_ed)
+     real(r8) :: seed_rain_flux(numpft_ed)                         ! flux of seeds from exterior KgC/m2/year (needed for C balance purposes)
 
      ! PHOTOSYNTHESIS       
      real(r8) ::  psn_z(nclmax,numpft_ed,nlevcan_ed)               ! carbon assimilation in each canopy layer, pft, and leaf layer. umolC/m2/s
@@ -395,9 +420,6 @@ module EDTypesMod
      ! INDICES 
      real(r8) ::  lat                                          ! latitude:  degrees 
      real(r8) ::  lon                                          ! longitude: degrees 
-     integer  ::  clmgcell                                     ! gridcell index
-     integer  ::  clmcolumn                                    ! column index (assuming there is only one soil column in each gcell.
-     logical  ::  istheresoil                                  ! are there any soil columns, or is this all ice/rocks/lakes?
 
      ! CARBON BALANCE       
      real(r8) ::  flux_in                                      ! for carbon balance purpose. C coming into biomass pool:  KgC/site
@@ -411,9 +433,9 @@ module EDTypesMod
      real(r8) ::  disturbance_rate                             ! site total dist rate
 
      ! PHENOLOGY 
+     real(r8) ::  ED_GDD_site                                  ! ED Phenology growing degree days.
      integer  ::  status                                       ! are leaves in this pixel on or off for cold decid
      integer  ::  dstatus                                      ! are leaves in this pixel on or off for drought decid
-     real(r8) ::  gdd                                          ! growing degree days: deg C. 
      real(r8) ::  ncd                                          ! no chilling days:-
      real(r8) ::  last_n_days(senes)                           ! record of last 10 days temperature for senescence model. deg C
      integer  ::  leafondate                                   ! doy of leaf on:-
@@ -421,13 +443,14 @@ module EDTypesMod
      integer  ::  dleafondate                                  ! doy of leaf on drought:-
      integer  ::  dleafoffdate                                 ! doy of leaf on drought:-
      real(r8) ::  water_memory(10)                             ! last 10 days of soil moisture memory...
-     real(r8) ::  cwd_ag_burned(ncwd)
-     real(r8) :: leaf_litter_burned(numpft_ed)
 
      ! FIRE 
      real(r8) ::  acc_ni                                       ! daily nesterov index accumulating over time.
      real(r8) ::  ab                                           ! daily burnt area: m2
      real(r8) ::  frac_burnt                                   ! fraction of soil burnt in this day.
+     real(r8) ::  total_burn_flux_to_atm                       ! total carbon burnt to the atmosphere in this day. KgC/site
+     real(r8) ::  cwd_ag_burned(ncwd)
+     real(r8) ::  leaf_litter_burned(numpft_ed)
 
   end type ed_site_type
 
@@ -436,13 +459,15 @@ module EDTypesMod
   !************************************
 
   type userdata
-     integer  ::   cohort_number            ! Counts up the number of cohorts which have been made. 
+     integer  ::   cohort_number            ! Counts up the number of cohorts which have been made.
+     integer  ::   n_sub                    ! num of substeps in year 
      real(r8) ::   deltat                   ! fraction of year used for each timestep (1/N_SUB)
      integer  ::   time_period              ! Within year timestep (1:N_SUB) day of year
      integer  ::   restart_year             ! Which year of simulation are we starting in? 
   end type userdata
 
-  type(userdata), public, target :: udata
+
+  type(userdata), public, target :: udata   ! THIS WAS NOT THREADSAFE
   !-------------------------------------------------------------------------------------!
 
   public :: ed_hist_scpfmaps

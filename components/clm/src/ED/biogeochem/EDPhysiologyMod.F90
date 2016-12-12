@@ -16,9 +16,8 @@ module EDPhysiologyMod
   use EDEcophysContype    , only : EDecophyscon
   use EDCohortDynamicsMod , only : allocate_live_biomass, zero_cohort
   use EDCohortDynamicsMod , only : create_cohort, fuse_cohorts, sort_cohorts
-  use EDPhenologyType     , only : ed_phenology_type
   use EDTypesMod          , only : dg_sf, dinc_ed, external_recruitment
-  use EDTypesMod          , only : ncwd, nlevcan_ed, n_sub, numpft_ed, senes
+  use EDTypesMod          , only : ncwd, nlevcan_ed, numpft_ed, senes
   use EDTypesMod          , only : ed_site_type, ed_patch_type, ed_cohort_type
 
   implicit none
@@ -71,7 +70,7 @@ contains
   end subroutine canopy_derivs
 
   ! ============================================================================
-  subroutine non_canopy_derivs( currentPatch, temperature_inst, soilstate_inst, waterstate_inst)
+  subroutine non_canopy_derivs( currentPatch, temperature_inst )
     !
     ! !DESCRIPTION:
     ! Returns time differentials of the state vector
@@ -81,8 +80,6 @@ contains
     ! !ARGUMENTS    
     type(ed_patch_type)    , intent(inout) :: currentPatch
     type(temperature_type) , intent(in)    :: temperature_inst
-    type(soilstate_type)   , intent(in)    :: soilstate_inst
-    type(waterstate_type)  , intent(in)    :: waterstate_inst
     !
     ! !LOCAL VARIABLES:
     integer c,p
@@ -109,7 +106,7 @@ contains
 
     ! update fragmenting pool fluxes
     call cwd_input(currentPatch)
-    call cwd_out( currentPatch, temperature_inst, soilstate_inst, waterstate_inst)
+    call cwd_out( currentPatch, temperature_inst)
 
     do p = 1,numpft_ed
        currentPatch%dseed_dt(p) = currentPatch%seeds_in(p) - currentPatch%seed_decay(p) - currentPatch%seed_germination(p)
@@ -125,15 +122,14 @@ contains
        currentPatch%droot_litter_dt(p) = currentPatch%root_litter_in(p) - currentPatch%root_litter_out(p) 
     enddo
 
-    currentPatch%leaf_litter_in(:)  = 0.0_r8
-    currentPatch%root_litter_in(:)  = 0.0_r8
-    currentPatch%leaf_litter_out(:) = 0.0_r8
-    currentPatch%root_litter_out(:) = 0.0_r8
-
-    currentPatch%CWD_AG_in(:)       = 0.0_r8
-    currentPatch%cwd_bg_in(:)       = 0.0_r8
-    currentPatch%CWD_AG_out(:)      = 0.0_r8
-    currentPatch%cwd_bg_out(:)      = 0.0_r8
+    ! currentPatch%leaf_litter_in(:)  = 0.0_r8
+    ! currentPatch%root_litter_in(:)  = 0.0_r8
+    ! currentPatch%leaf_litter_out(:) = 0.0_r8
+    ! currentPatch%root_litter_out(:) = 0.0_r8
+    ! currentPatch%CWD_AG_in(:)       = 0.0_r8
+    ! currentPatch%cwd_bg_in(:)       = 0.0_r8
+    ! currentPatch%CWD_AG_out(:)      = 0.0_r8
+    ! currentPatch%cwd_bg_out(:)      = 0.0_r8
 
   end subroutine non_canopy_derivs
 
@@ -188,13 +184,13 @@ contains
                    currentCohort%leaf_cost =  1._r8/(pftcon%slatop(currentCohort%pft)*1000.0_r8)
                    currentCohort%leaf_cost = currentCohort%leaf_cost + 1.0_r8/(pftcon%slatop(currentCohort%pft)*1000.0_r8) * &
                         pftcon%froot_leaf(currentCohort%pft) / EDecophyscon%root_long(currentCohort%pft)
-                   currentCohort%leaf_cost = currentCohort%leaf_cost * (ED_val_grperc(1) + 1._r8)
+                   currentCohort%leaf_cost = currentCohort%leaf_cost * (ED_val_grperc(currentCohort%pft) + 1._r8)
                 else !evergreen costs
                    currentCohort%leaf_cost = 1.0_r8/(pftcon%slatop(currentCohort%pft)* &
-                        pftcon%leaf_long(currentCohort%pft)*1000.0_r8) !convert from sla in m2g-1 to m2kg-1 
+                        pftcon%leaf_long(currentCohort%pft)*1000.0_r8) !convert from sla in m2g-1 to m2kg-1
                    currentCohort%leaf_cost = currentCohort%leaf_cost + 1.0_r8/(pftcon%slatop(currentCohort%pft)*1000.0_r8) * &
                         pftcon%froot_leaf(currentCohort%pft) / EDecophyscon%root_long(currentCohort%pft)
-                   currentCohort%leaf_cost = currentCohort%leaf_cost * (ED_val_grperc(1) + 1._r8)
+                   currentCohort%leaf_cost = currentCohort%leaf_cost * (ED_val_grperc(currentCohort%pft) + 1._r8)
                 endif
                 if (currentCohort%year_net_uptake(z) < currentCohort%leaf_cost)then
                    if (currentCohort%canopy_trim > trim_limit)then
@@ -216,10 +212,11 @@ contains
              endif !leaf activity? 
           enddo !z
           if (currentCohort%NV.gt.2)then
-             write(iulog,*) 'nv>4',currentCohort%year_net_uptake(1:6),currentCohort%leaf_cost,&
-             currentCohort%canopy_trim
+             ! leaf_cost may be uninitialized, removing its diagnostic from the log
+             ! to allow checking with fpe_traps (RGK)
+             write(iulog,*) 'nv>4',currentCohort%year_net_uptake(1:6),currentCohort%canopy_trim
           endif
-       
+
           currentCohort%year_net_uptake(:) = 999.0_r8
           if (trimmed == 0.and.currentCohort%canopy_trim < 1.0_r8)then
              currentCohort%canopy_trim = currentCohort%canopy_trim + inc
@@ -238,27 +235,25 @@ contains
   end subroutine trim_canopy
 
   ! ============================================================================
-  subroutine phenology( currentSite, ed_phenology_inst, temperature_inst, waterstate_inst)
+  subroutine phenology( currentSite, temperature_inst, waterstate_inst)
     !
     ! !DESCRIPTION:
     ! Phenology. 
     !
     ! !USES:
     use clm_varcon, only : tfrz
-    use clm_time_manager, only : get_days_per_year, get_curr_date
+    use clm_time_manager, only : get_curr_date
     use clm_time_manager, only : get_ref_date, timemgr_datediff 
     use EDTypesMod, only : udata
+    use PatchType , only : patch   
     !
     ! !ARGUMENTS:
-    type(ed_site_type)      , intent(inout), pointer:: currentSite
-    type(ed_phenology_type) , intent(in)            :: ed_phenology_inst
+    type(ed_site_type)      , intent(inout), target :: currentSite
     type(temperature_type)  , intent(in)            :: temperature_inst
     type(waterstate_type)   , intent(in)            :: waterstate_inst
     !
     ! !LOCAL VARIABLES:
     real(r8), pointer :: t_veg24(:) 
-    real(r8), pointer :: ED_GDD_patch(:)     
-    integer  :: g            ! grid point  
     integer  :: t            ! day of year
     integer  :: ncolddays    ! no days underneath the threshold for leaf drop
     integer  :: ncolddayslim ! critical no days underneath the threshold for leaf drop
@@ -271,12 +266,15 @@ contains
     integer  :: mon                      ! month (1, ..., 12)
     integer  :: day                      ! day of month (1, ..., 31)
     integer  :: sec                      ! seconds of the day
+    integer  :: patchi                   ! the first CLM/ALM patch index of the associated column
+    integer  :: coli                     ! the CLM/ALM column index of the associated site
 
     real(r8) :: gdd_threshold
-    real(r8) :: a,b,c                      ! params of leaf-pn model from botta et al. 2000. 
-    real(r8) :: cold_t                     ! threshold below which cold days are counted 
-    real(r8) :: coldday                    ! definition of a 'chilling day' for botta model 
-    real(r8) :: ncdstart                   ! beginning of counting period for growing degree days.
+    real(r8) :: a,b,c        ! params of leaf-pn model from botta et al. 2000. 
+    real(r8) :: cold_t       ! threshold below which cold days are counted 
+    real(r8) :: coldday      ! definition of a 'chilling day' for botta model 
+    integer  :: ncdstart     ! beginning of counting period for chilling degree days.
+    integer  :: gddstart     ! beginning of counting period for growing degree days.
     real(r8) :: drought_threshold
     real(r8) :: off_time                   ! minimum number of days between leaf off and leaf on for drought phenology 
     real(r8) :: temp_in_C                  ! daily averaged temperature in celcius
@@ -296,12 +294,13 @@ contains
 
     !------------------------------------------------------------------------
 
+    ! INTERF-TODO: THIS IS A BAND-AID, AS I WAS HOPING TO REMOVE CLM_PNO
+    ! ALREADY REMOVED currentSite%clmcolumn, hence the need for these
+
+    patchi = currentSite%oldest_patch%clm_pno-1
+    coli   = patch%column(patchi)
+
     t_veg24       => temperature_inst%t_veg24_patch ! Input:  [real(r8) (:)]  avg pft vegetation temperature for last 24 hrs    
-    ED_GDD_patch  => ed_phenology_inst%ED_GDD_patch ! Input:  [real(r8) (:)]  growing deg. days base 0 deg C (ddays)
-
-
-    g = currentSite%clmgcell
-
 
     call get_curr_date(yr, mon, day, sec)
     curdate = yr*10000 + mon*100 + day
@@ -330,15 +329,17 @@ contains
     cold_t   = EDecophyscon%ed_ph_coldtemp                                    ! 7.5_r8  
 
     t  = udata%time_period
-    temp_in_C = t_veg24(currentSite%oldest_patch%clm_pno-1) - tfrz
+    temp_in_C = t_veg24(patchi) - tfrz
 
     !-----------------Cold Phenology--------------------!              
 
     !Zero growing degree and chilling day counters
     if (currentSite%lat > 0)then
-       ncdstart = 270._r8; !Northern Hemisphere begining November
+       ncdstart = 270  !Northern Hemisphere begining November
+       gddstart = 1    !Northern Hemisphere begining January
     else
-       ncdstart = 120._r8;  !Southern Hemisphere beginning May
+       ncdstart = 120  !Southern Hemisphere beginning May
+       gddstart = 181  !Northern Hemisphere begining July
     endif
     
     ! FIX(SPM,032414) - this will only work for the first year, no?
@@ -364,12 +365,25 @@ contains
        endif
     enddo
 
+    ! Here is where we do the GDD accumulation calculation
+    !
+    ! reset GDD on set dates
+    if (t == gddstart)then
+       currentSite%ED_GDD_site = 0._r8
+    endif
+    !
+    ! accumulate the GDD using daily mean temperatures
+    if (t_veg24(patchi) .gt. tfrz) then
+       currentSite%ED_GDD_site = currentSite%ED_GDD_site + t_veg24(currentSite%oldest_patch%clm_pno-1) - tfrz
+    endif
+    
+
     timesinceleafoff = modelday - currentSite%leafoffdate
     !LEAF ON: COLD DECIDUOUS. Needs to
     !1) have exceeded the growing degree day threshold 
     !2) The leaves should not be on already
     !3) There should have been at least on chilling day in the counting period.  
-    if (ED_GDD_patch(currentSite%oldest_patch%clm_pno) > gdd_threshold)then
+    if (currentSite%ED_GDD_site > gdd_threshold)then
        if (currentSite%status == 1) then
           if (currentSite%ncd >= 1) then
              currentSite%status = 2     !alter status of site to 'leaves on'
@@ -437,7 +451,7 @@ contains
     ! distinction actually matter??).... 
 
     !Accumulate surface water memory of last 10 days.
-    currentSite%water_memory(1) = waterstate_inst%h2osoi_vol_col(currentSite%clmcolumn,1) 
+    currentSite%water_memory(1) = waterstate_inst%h2osoi_vol_col(coli,1) 
     do i = 1,9 !shift memory along one
        currentSite%water_memory(11-i) = currentSite%water_memory(10-i)
     enddo
@@ -515,7 +529,7 @@ contains
     ! !USES:
     !
     ! !ARGUMENTS:
-    type(ed_site_type), intent(inout), pointer:: currentSite
+    type(ed_site_type), intent(inout), target :: currentSite
     !
     ! !LOCAL VARIABLES:
     type(ed_patch_type) , pointer :: currentPatch     
@@ -647,6 +661,8 @@ contains
     currentSite  => currentPatch%siteptr
    
     currentPatch%seeds_in(:) = 0.0_r8
+    currentPatch%seed_rain_flux(:) = 0.0_r8
+    
     currentCohort => currentPatch%tallest
     do while (associated(currentCohort))
        p = currentCohort%pft
@@ -660,6 +676,7 @@ contains
        if (EXTERNAL_RECRUITMENT == 1) then !external seed rain - needed to prevent extinction  
           do p = 1,numpft_ed
            currentPatch%seeds_in(p) = currentPatch%seeds_in(p) + EDecophyscon%seed_rain(p) !KgC/m2/year
+           currentPatch%seed_rain_flux(p) = currentPatch%seed_rain_flux(p) + EDecophyscon%seed_rain(p) !KgC/m2/year
           enddo
        endif
        currentPatch => currentPatch%younger
@@ -780,9 +797,9 @@ contains
     ! NPP 
     if ( DEBUG ) write(iulog,*) 'EDphys 716 ',currentCohort%npp_acc
 
-    currentCohort%npp  = currentCohort%npp_acc  * N_SUB   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
-    currentCohort%gpp  = currentCohort%gpp_acc  * N_SUB   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
-    currentCohort%resp = currentCohort%resp_acc * N_SUB   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
+    currentCohort%npp  = currentCohort%npp_acc  * udata%n_sub   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
+    currentCohort%gpp  = currentCohort%gpp_acc  * udata%n_sub   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
+    currentCohort%resp = currentCohort%resp_acc * udata%n_sub   !Link to CLM. convert from kgC/indiv/day into kgC/indiv/year
 
     currentSite%flux_in = currentSite%flux_in + currentCohort%npp_acc * currentCohort%n
 
@@ -1138,6 +1155,7 @@ contains
     ! !USES:
     use shr_const_mod      , only : SHR_CONST_PI, SHR_CONST_TKFRZ
     use EDSharedParamsMod  , only : EDParamsShareInst
+
     !
     ! !ARGUMENTS    
     type(ed_patch_type)    , intent(inout) :: currentPatch
@@ -1146,7 +1164,7 @@ contains
     ! !LOCAL VARIABLES:
     logical  :: use_century_tfunc = .false.
     type(ed_site_type), pointer :: currentSite
-    integer  :: c,p,j
+    integer  :: p,j
     real(r8) :: t_scalar
     real(r8) :: w_scalar
     real(r8) :: catanf                ! hyperbolic temperature function from CENTURY
@@ -1163,7 +1181,7 @@ contains
 
     catanf_30 = catanf(30._r8)
     
-    c = currentPatch%siteptr%clmcolumn
+!    c = currentPatch%siteptr%clmcolumn
     p = currentPatch%clm_pno
     
     ! set "froz_q10" parameter
@@ -1195,7 +1213,7 @@ contains
   end subroutine fragmentation_scaler
   
   ! ============================================================================
-  subroutine cwd_out( currentPatch, temperature_inst, soilstate_inst, waterstate_inst)
+  subroutine cwd_out( currentPatch, temperature_inst )
     !
     ! !DESCRIPTION:
     ! Simple CWD fragmentation Model
@@ -1208,8 +1226,6 @@ contains
     ! !ARGUMENTS    
     type(ed_patch_type)    , intent(inout), target :: currentPatch
     type(temperature_type) , intent(in)            :: temperature_inst
-    type(soilstate_type)   , intent(in)            :: soilstate_inst
-    type(waterstate_type)  , intent(in)            :: waterstate_inst
     !
     ! !LOCAL VARIABLES:
     type(ed_site_type), pointer :: currentSite
@@ -1262,5 +1278,7 @@ contains
          currentPatch%area *udata%deltat!kgC/site/day
 
   end subroutine cwd_out
+
+
 
 end module EDPhysiologyMod

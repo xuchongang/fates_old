@@ -27,7 +27,7 @@ module EDCohortDynamicsMod
   public :: sort_cohorts
   public :: copy_cohort
   public :: count_cohorts
-  public :: countCohorts
+!  public :: countCohorts
   public :: allocate_live_biomass
 
   logical, parameter :: DEBUG  = .false. ! local debug flag
@@ -68,8 +68,8 @@ contains
     !----------------------------------------------------------------------
 
     allocate(new_cohort)
-    udata%cohort_number = udata%cohort_number + 1 !give each cohort a unique number for checking cohort fusing routine.
-    
+    udata%cohort_number = udata%cohort_number + 1  !give each cohort a unique number for checking cohort fusing routine.
+
     call nan_cohort(new_cohort)  ! Make everything in the cohort not-a-number
     call zero_cohort(new_cohort) ! Zero things that need to be zeroed. 
 
@@ -613,7 +613,6 @@ contains
     iterate = 1
     fusion_took_place = 0   
     currentPatch => patchptr
-   ! maxcohorts =  currentPatch%NCL_p * numCohortsPerPatch
     maxcohorts = numCohortsPerPatch
   
     !---------------------------------------------------------------------!
@@ -624,8 +623,13 @@ contains
 
          currentCohort => currentPatch%tallest
 
-         !CHANGED FROM C VERSION  loop from tallest to smallest, fusing if they are similar
-         do while (currentCohort%indexnumber /= currentPatch%shortest%indexnumber)  
+         ! The following logic continues the loop while the current cohort is not the shortest cohort
+         ! if they point to the same target (ie equivalence), then the loop ends.
+         ! This loop is different than the simple "continue while associated" loop in that
+         ! it omits the last cohort (because it has already been compared by that point)
+
+         do while ( .not.associated(currentCohort,currentPatch%shortest) )
+
           nextc => currentPatch%tallest
 
           do while (associated(nextc))
@@ -636,7 +640,8 @@ contains
 
              if (diff < dynamic_fusion_tolerance) then
 
-                if (currentCohort%indexnumber /= nextc%indexnumber) then
+                ! Don't fuse a cohort with itself!
+                if (.not.associated(currentCohort,nextc) ) then
 
                    if (currentCohort%pft == nextc%pft) then              
 
@@ -732,7 +737,7 @@ contains
                                   nextc%n*nextc%year_net_uptake(i))/newn                
                             endif
                          enddo
-
+                         
                          currentCohort%n = newn     
                          !remove fused cohort from the list
                          nextc%taller%shorter => nextnextc        
@@ -982,8 +987,8 @@ contains
     n => copyc
 
     udata%cohort_number = udata%cohort_number + 1
-    n%indexnumber = udata%cohort_number
-
+    n%indexnumber       = udata%cohort_number
+    
     ! VEGETATION STRUCTURE
     n%pft             = o%pft
     n%n               = o%n                         
@@ -1132,46 +1137,46 @@ contains
   end function count_cohorts
 
   !-------------------------------------------------------------------------------------!
-  function countCohorts( bounds, ed_allsites_inst ) result ( totNumCohorts ) 
+!  function countCohorts( bounds, ed_allsites_inst ) result ( totNumCohorts ) 
     !
     ! !DESCRIPTION:
     !  counts the total number of cohorts over all p levels (ed_patch_type) so we
     ! can allocate vectors, copy from LL -> vector and read/write restarts.
     !
     ! !USES:
-    use decompMod, only : bounds_type
+!    use decompMod, only : bounds_type
     !
     ! !ARGUMENTS    
-    type(bounds_type)  , intent(in)            :: bounds 
-    type(ed_site_type) , intent(inout), target :: ed_allsites_inst( bounds%begg: )
+!    type(bounds_type)  , intent(in)            :: bounds 
+!    type(ed_site_type) , intent(inout), target :: ed_allsites_inst( bounds%begg: )
     !
     ! !LOCAL VARIABLES:
-    type (ed_patch_type)  , pointer :: currentPatch
-    type (ed_cohort_type) , pointer :: currentCohort
-    integer :: g, totNumCohorts
-    logical :: error
+!    type (ed_patch_type)  , pointer :: currentPatch
+!    type (ed_cohort_type) , pointer :: currentCohort
+!    integer :: g, totNumCohorts
+!    logical :: error
     !----------------------------------------------------------------------
 
-    totNumCohorts = 0
+!    totNumCohorts = 0
 
-    do g = bounds%begg,bounds%endg
+!    do g = bounds%begg,bounds%endg
 
-       if (ed_allsites_inst(g)%istheresoil) then   
+!       if (ed_allsites_inst(g)%istheresoil) then   
 
-          currentPatch => ed_allsites_inst(g)%oldest_patch
-          do while(associated(currentPatch))
+!          currentPatch => ed_allsites_inst(g)%oldest_patch
+!          do while(associated(currentPatch))
 
-             currentCohort => currentPatch%shortest
-             do while(associated(currentCohort))        
-                totNumCohorts = totNumCohorts + 1
-                currentCohort => currentCohort%taller
-             enddo !currentCohort
-             currentPatch => currentPatch%younger
-          end do
+!             currentCohort => currentPatch%shortest
+!             do while(associated(currentCohort))        
+!                totNumCohorts = totNumCohorts + 1
+!                currentCohort => currentCohort%taller
+!             enddo !currentCohort
+!             currentPatch => currentPatch%younger
+!          end do
 
-       end if
-    end do
+!       end if
+!    end do
 
-  end function countCohorts
+!  end function countCohorts
 
 end module EDCohortDynamicsMod

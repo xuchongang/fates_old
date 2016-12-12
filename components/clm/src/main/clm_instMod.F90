@@ -13,6 +13,7 @@ module clm_instMod
   use clm_varcon      , only : h2osno_max, bdsno, c13ratio, c14ratio
   use landunit_varcon , only : istice, istice_mec, istsoil
   use perf_mod        , only : t_startf, t_stopf
+  
 
   !-----------------------------------------
   ! Constants
@@ -22,7 +23,6 @@ module clm_instMod
   use UrbanParamsType                    , only : IsSimpleBuildTemp, IsProgBuildTemp
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
   use CNDVType                           , only : dgv_ecophyscon     ! Constants 
-  use EDEcophysConType                   , only : EDecophyscon       ! ED Constants
 
   !-----------------------------------------
   ! Definition of component types 
@@ -73,9 +73,7 @@ module clm_instMod
   use LandunitType                    , only : lun                
   use ColumnType                      , only : col                
   use PatchType                       , only : patch                
-  use EDTypesMod                      , only : ed_site_type
-  use EDPhenologyType                 , only : ed_phenology_type
-  use EDCLMLinkMod                    , only : ed_clm_type
+  use CLMFatesInterfaceMod            , only : hlm_fates_interface_type
   use SoilWaterRetentionCurveMod      , only : soil_water_retention_curve_type
   use NutrientCompetitionMethodMod    , only : nutrient_competition_method_type
   !
@@ -149,10 +147,9 @@ module clm_instMod
   type(vocemis_type)                      :: vocemis_inst
   type(drydepvel_type)                    :: drydepvel_inst
 
-  ! ED types passed in from top level
-  type(ed_site_type), allocatable, target :: ed_allsites_inst(:)
-  type(ed_phenology_type)                 :: ed_phenology_inst
-  type(ed_clm_type)                       :: ed_clm_inst
+  ! FATES
+  type(hlm_fates_interface_type)          :: clm_fates
+
   !
   public :: clm_instInit
   public :: clm_instRest
@@ -170,20 +167,22 @@ contains
     use SoilBiogeochemDecompCascadeBGCMod  , only : init_decompcascade_bgc
     use SoilBiogeochemDecompCascadeCNMod   , only : init_decompcascade_cn
     use SoilBiogeochemDecompCascadeContype , only : init_decomp_cascade_constants
-    use EDEcophysConType                   , only : EDecophysconInit 
-    use EDPftVarcon                        , only : EDpftvarcon_inst
+    
     use initVerticalMod                    , only : initVertical
     use accumulMod                         , only : print_accum_fields 
     use SoilWaterRetentionCurveFactoryMod  , only : create_soil_water_retention_curve
+    use decompMod                          , only : get_proc_bounds
     !
     ! !ARGUMENTS    
     type(bounds_type), intent(in) :: bounds  ! processor bounds
     !
     ! !LOCAL VARIABLES:
     integer               :: c,l,g
+    integer               :: nclumps,nc
     integer               :: begp, endp
     integer               :: begc, endc
     integer               :: begl, endl
+    type(bounds_type)     :: bounds_clump
     real(r8), allocatable :: h2osno_col(:)
     real(r8), allocatable :: snow_depth_col(:)
 
@@ -325,7 +324,7 @@ contains
 
     call drydepvel_inst%Init(bounds)
 
-    if (use_cn) then
+    if (use_cn .or. use_ed ) then
 
        ! Note - always initialize the memory for the c13_xxx_inst and
        ! c14_xxx_inst data structure so that they can be used in 
@@ -349,7 +348,7 @@ contains
           call init_decompcascade_cn(bounds, soilbiogeochem_state_inst)
        end if
 
-       ! Initalize soilbiogeochem carbon and nitrogen types
+       ! Initalize soilbiogeochem carbon types
 
        call soilbiogeochem_carbonstate_inst%Init(bounds, carbon_type='c12', ratio=1._r8)
        if (use_c13) then
@@ -360,10 +359,6 @@ contains
           call c14_soilbiogeochem_carbonstate_inst%Init(bounds, carbon_type='c14', ratio=c14ratio, &
                c12_soilbiogeochem_carbonstate_inst=soilbiogeochem_carbonstate_inst)
        end if
-       call soilbiogeochem_nitrogenstate_inst%Init(bounds, &
-            soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col(begc:endc,1:nlevdecomp_full,1:ndecomp_pools), &
-            soilbiogeochem_carbonstate_inst%decomp_cpools_col(begc:endc,1:ndecomp_pools),  &
-            soilbiogeochem_carbonstate_inst%decomp_cpools_1m_col(begc:endc, 1:ndecomp_pools))
 
        call soilbiogeochem_carbonflux_inst%Init(bounds, carbon_type='c12') 
        if (use_c13) then
@@ -372,6 +367,18 @@ contains
        if (use_c14) then
           call c14_soilbiogeochem_carbonflux_inst%Init(bounds, carbon_type='c14')
        end if
+
+    end if
+
+    if ( use_cn ) then 
+
+       ! Initalize soilbiogeochem nitrogen types
+
+       call soilbiogeochem_nitrogenstate_inst%Init(bounds, &
+            soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col(begc:endc,1:nlevdecomp_full,1:ndecomp_pools), &
+            soilbiogeochem_carbonstate_inst%decomp_cpools_col(begc:endc,1:ndecomp_pools),  &
+            soilbiogeochem_carbonstate_inst%decomp_cpools_1m_col(begc:endc, 1:ndecomp_pools))
+
        call soilbiogeochem_nitrogenflux_inst%Init(bounds) 
 
        ! Initalize cnveg carbon and nitrogen types
@@ -417,13 +424,11 @@ contains
     ! if use_ed is true, then the actual memory for all of the ED data structures
     ! is allocated in the call to EDInitMod - called from clm_initialize
     ! NOTE (SPM, 10-27-2015) ... check on deallocation of ed_allsites_inst
+    ! NOTE (RGK, 04-25-2016) : Updating names, ED is now part of FATES
+    !                          Incrementally changing to ED names to FATES
 
-    allocate (ed_allsites_inst(bounds%begg:bounds%endg))
-    if (use_ed) then
-       call ed_clm_inst%Init(bounds)
-       call ed_phenology_inst%Init(bounds)
-       call EDecophysconInit( EDpftvarcon_inst, numpft)
-    end if
+    call clm_fates%Init(bounds,use_ed)
+    call clm_fates%init_allocate()
 
     deallocate (h2osno_col)
     deallocate (snow_depth_col)
@@ -440,10 +445,6 @@ contains
     call atm2lnd_inst%InitAccBuffer(bounds)
 
     call temperature_inst%InitAccBuffer(bounds)
-
-    if (use_ed) then
-       call ed_phenology_inst%initAccBuffer(bounds)
-    endif
 
     call canopystate_inst%InitAccBuffer(bounds)
 
@@ -468,14 +469,22 @@ contains
     use ncdio_pio       , only : file_desc_t
     use EDRestVectorMod , only : EDRest
     use UrbanParamsType , only : IsSimpleBuildTemp, IsProgBuildTemp
+    use decompMod       , only : get_proc_bounds, get_proc_clumps, get_clump_bounds
+
     !
     ! !DESCRIPTION:
     ! Define/write/read CLM restart file.
     !
     ! !ARGUMENTS:
     type(bounds_type) , intent(in)    :: bounds          
+    
     type(file_desc_t) , intent(inout) :: ncid ! netcdf id
     character(len=*)  , intent(in)    :: flag ! 'define', 'write', 'read' 
+
+    ! Local variables
+    integer                           :: nc, nclumps
+    type(bounds_type)                 :: bounds_clump
+
     !-----------------------------------------------------------------------
 
     call atm2lnd_inst%restart (bounds, ncid, flag=flag)
@@ -519,7 +528,7 @@ contains
        call ch4_inst%restart(bounds, ncid, flag=flag)
     end if
 
-    if (use_cn) then
+    if (use_cn .or. use_ed) then
 
        call soilbiogeochem_state_inst%restart(bounds, ncid, flag=flag)
        call soilbiogeochem_carbonstate_inst%restart(bounds, ncid, flag=flag, carbon_type='c12')
@@ -532,6 +541,9 @@ contains
                c12_soilbiogeochem_carbonstate_inst=soilbiogeochem_carbonstate_inst)
        end if
        call soilbiogeochem_carbonflux_inst%restart(bounds, ncid, flag=flag)
+    endif
+    if ( use_cn ) then
+       
        call soilbiogeochem_nitrogenstate_inst%restart(bounds, ncid, flag=flag)
        call soilbiogeochem_nitrogenflux_inst%restart(bounds, ncid, flag=flag)
 
@@ -556,12 +568,14 @@ contains
     end if
 
     if (use_ed) then
-       call ED_Phenology_inst%restart(bounds, ncid, flag=flag)
-       call EDRest ( bounds, ncid, flag, ed_allsites_inst(bounds%begg:bounds%endg), &
-            ed_clm_inst, ed_phenology_inst, waterstate_inst, canopystate_inst )
+
+       ! Bounds are not passed to FATES init_restart because
+       ! we call a loop on clumps within this subroutine anyway
+       call clm_fates%init_restart(ncid,flag, waterstate_inst, canopystate_inst)
+
     end if
 
-  end subroutine clm_instRest
+ end subroutine clm_instRest
 
 end module clm_instMod
 

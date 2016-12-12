@@ -9,7 +9,7 @@ module EDPatchDynamicsMod
   use clm_varctl           , only : iulog 
   use pftconMod            , only : pftcon
   use EDCohortDynamicsMod  , only : fuse_cohorts, sort_cohorts, insert_cohort
-  use EDtypesMod           , only : ncwd, n_dbh_bins, ntol, numpft_ed, area, dbhmax, numPatchesPerGridCell
+  use EDtypesMod           , only : ncwd, n_dbh_bins, ntol, numpft_ed, area, dbhmax, numPatchesPerCol
   use EDTypesMod           , only : ed_site_type, ed_patch_type, ed_cohort_type, udata
   use EDTypesMod           , only : min_patch_area
   !
@@ -200,8 +200,11 @@ contains
 
     ! calculate area of disturbed land, in this timestep, by summing contributions from each existing patch. 
     currentPatch => currentSite%youngest_patch
+
+    ! zero site-level fire fluxes
     currentSite%cwd_ag_burned       = 0.0_r8
     currentSite%leaf_litter_burned  = 0.0_r8
+    currentSite%total_burn_flux_to_atm = 0.0_r8    
 
     site_areadis = 0.0_r8
     do while(associated(currentPatch))
@@ -548,12 +551,14 @@ contains
           burned_litter = new_patch%cwd_ag(c) * patch_site_areadis/new_patch%area * currentPatch%burnt_frac_litter(c+1) !kG/m2/day
           new_patch%cwd_ag(c) = new_patch%cwd_ag(c) - burned_litter
           currentSite%flux_out = currentSite%flux_out + burned_litter * new_patch%area !kG/site/day
+          currentSite%total_burn_flux_to_atm = currentSite%total_burn_flux_to_atm + burned_litter * new_patch%area !kG/site/day
        enddo
 
        do p = 1,numpft_ed
           burned_litter = new_patch%leaf_litter(p) * patch_site_areadis/new_patch%area * currentPatch%burnt_frac_litter(dg_sf)
           new_patch%leaf_litter(p) = new_patch%leaf_litter(p) - burned_litter
-          currentSite%flux_out = currentSite%flux_out + burned_litter * new_patch%area !kG/site/dat
+          currentSite%flux_out = currentSite%flux_out + burned_litter * new_patch%area !kG/site/day
+          currentSite%total_burn_flux_to_atm = currentSite%total_burn_flux_to_atm + burned_litter * new_patch%area !kG/site/day
       enddo
 
        !************************************/     
@@ -615,6 +620,8 @@ contains
                      SF_val_CWD_frac(c) * bstem * currentCohort%cfa
                 currentSite%flux_out  = currentSite%flux_out + dead_tree_density * &
                      AREA * SF_val_CWD_frac(c) * bstem * currentCohort%cfa
+                currentSite%total_burn_flux_to_atm  = currentSite%total_burn_flux_to_atm + dead_tree_density * &
+                     AREA * SF_val_CWD_frac(c) * bstem * currentCohort%cfa
 
              enddo
              
@@ -624,6 +631,8 @@ contains
                 currentSite%leaf_litter_burned(p) = currentSite%leaf_litter_burned(p) + &
                      dead_tree_density * currentCohort%bl * currentCohort%cfa
                 currentSite%flux_out  = currentSite%flux_out + &
+                     dead_tree_density * AREA * currentCohort%bl * currentCohort%cfa
+                currentSite%total_burn_flux_to_atm  = currentSite%total_burn_flux_to_atm + &
                      dead_tree_density * AREA * currentCohort%bl * currentCohort%cfa
 
              enddo
@@ -654,6 +663,8 @@ contains
              currentCohort%bl     = max(0.00001_r8,   currentCohort%bl - burned_leaves)
              !KgC/gridcell/day
              currentSite%flux_out = currentSite%flux_out + burned_leaves * currentCohort%n * &
+                  patch_site_areadis/currentPatch%area * AREA 
+             currentSite%total_burn_flux_to_atm = currentSite%total_burn_flux_to_atm+ burned_leaves * currentCohort%n * &
                   patch_site_areadis/currentPatch%area * AREA 
 
           endif
@@ -1003,7 +1014,7 @@ contains
     !---------------------------------------------------------------------
 
     !maxpatch = 4  
-    maxpatch = numPatchesPerGridCell
+    maxpatch = numPatchesPerCol
 
     currentSite => csite 
 
@@ -1113,7 +1124,7 @@ contains
        if(nopatches > maxpatch)then
           iterate = 1
           profiletol = profiletol * 1.1_r8
-          write(iulog,*) 'maxpatch exceeded, triggering patch fusion iteration.',profiletol,nopatches
+
           !---------------------------------------------------------------------!
           ! Making profile tolerance larger means that more fusion will happen  !
           !---------------------------------------------------------------------!        
@@ -1147,6 +1158,9 @@ contains
     type (ed_cohort_type), pointer :: storebigcohort  
     integer :: c,p !counters for pft and litter size class. 
     integer :: tnull,snull  ! are the tallest and shortest cohorts associated?
+    type(ed_patch_type), pointer :: youngerp   ! pointer to the patch younger than donor
+    type(ed_patch_type), pointer :: olderp     ! pointer to the patch older than donor
+    type(ed_site_type),  pointer :: csite      ! pointer to the donor patch's site
     !---------------------------------------------------------------------
 
     !area weighted average of ages & litter & seed bank
@@ -1242,24 +1256,46 @@ contains
 
     call patch_pft_size_profile(rp) ! Recalculate the patch size profile for the resulting patch
 
-    ! FIX(SPM,032414) dangerous code here.  Passing in dp as a pointer allows the code below
-    ! to effect the currentPatch that is the actual argument when in reality, dp should be 
-    ! intent in only with these pointers being set on the actual argument
-    ! outside of this routine (in fuse_patches).  basically this should be split
-    ! into a copy, then change pointers, then delete.
+    ! Define some aliases for the donor patches younger and older neighbors
+    ! which may or may not exist.  After we set them, we will remove the donor
+    ! And then we will go about re-setting the map.
+    csite => dp%siteptr
+    if(associated(dp%older))then
+       olderp => dp%older
+    else
+       olderp => null()
+    end if
+    if(associated(dp%younger))then
+       youngerp => dp%younger
+    else
+       youngerp => null()
+    end if
 
-    if(associated(dp%younger)) then 
-       dp%younger%older => dp%older
-    else 
-       dp%siteptr%youngest_patch => dp%older !youngest
-    endif
-    if(associated(dp%older)) then 
-       dp%older%younger => dp%younger
-    else 
-       dp%siteptr%oldest_patch => dp%younger  !oldest
-    endif
-
+    ! We have no need for the dp pointer anymore, we have passed on it's legacy
     deallocate(dp)
+
+
+    if(associated(youngerp))then
+       ! Update the younger patch's new older patch (because it isn't dp anymore)
+       youngerp%older => olderp
+    else
+       ! There was no younger patch than dp, so the head of the young order needs
+       ! to be set, and it is set as the patch older than dp.  That patch
+       ! already knows it's older patch (so no need to set or change it)
+       csite%youngest_patch => olderp
+    end if
+
+    
+    if(associated(olderp))then
+       ! Update the older patch's new younger patch (becuase it isn't dp anymore)
+       olderp%younger => youngerp
+    else
+       ! There was no patch older than dp, so the head of the old patch order needs
+       ! to be set, and it is set as the patch younger than dp.  That patch already
+       ! knows it's younger patch, no need to set
+       csite%oldest_patch => youngerp
+    end if
+
 
   end subroutine fuse_2_patches
 
@@ -1276,7 +1312,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     type(ed_site_type),  pointer :: currentSite
-    type(ed_patch_type), pointer :: currentPatch
+    type(ed_patch_type), pointer :: currentPatch, tmpptr
     real(r8) areatot ! variable for checking whether the total patch area is wrong. 
     !---------------------------------------------------------------------
  
@@ -1288,15 +1324,22 @@ contains
     currentPatch => currentSite%youngest_patch
     do while(associated(currentPatch)) 
        if(currentPatch%area <= min_patch_area)then
-          if(associated(currentPatch%older).and.currentPatch%patchno /= currentSite%youngest_patch%patchno)then
+          if ( currentPatch%patchno /= currentSite%youngest_patch%patchno) then
             ! Do not force the fusion of the youngest patch to its neighbour. 
             ! This is only really meant for very old patches. 
-             write(iulog,*) 'fusing patches because one is too small',currentPatch%area, currentPatch%lai, &
-                  currentPatch%older%area,currentPatch%older%lai,currentPatch%seed_bank(1)
-             call fuse_2_patches(currentPatch%older, currentPatch)
-             deallocate(currentPatch%older)
-             write(iulog,*) 'after fusion',currentPatch%area,currentPatch%seed_bank(1)
-           endif
+             if(associated(currentPatch%older) )then
+                write(iulog,*) 'fusing to older patch because this one is too small',currentPatch%area, currentPatch%lai, &
+                     currentPatch%older%area,currentPatch%older%lai,currentPatch%seed_bank(1)
+                call fuse_2_patches(currentPatch%older, currentPatch)
+                write(iulog,*) 'after fusion to older patch',currentPatch%area,currentPatch%seed_bank(1)
+             else
+                write(iulog,*) 'fusing to younger patch because oldest one is too small',currentPatch%area, currentPatch%lai
+                tmpptr => currentPatch%younger
+                call fuse_2_patches(currentPatch, currentPatch%younger)
+                write(iulog,*) 'after fusion to younger patch'
+                currentPatch => tmpptr
+             endif
+          endif
        endif
 
        currentPatch => currentPatch%older
@@ -1310,7 +1353,7 @@ contains
        areatot = areatot + currentPatch%area
        currentPatch => currentPatch%younger
        if((areatot-area) > 0.0000001_r8)then
-          write(iulog,*) 'ED: areatot too large. end terminate', areatot,currentSite%clmgcell
+          write(iulog,*) 'ED: areatot too large. end terminate', areatot
        endif
     enddo
 
@@ -1384,7 +1427,7 @@ contains
   end subroutine patch_pft_size_profile
 
   ! ============================================================================
-  function countPatches( bounds, ed_allsites_inst ) result ( totNumPatches ) 
+  function countPatches( bounds, sites, nsites ) result ( totNumPatches ) 
     !
     ! !DESCRIPTION:
     !  Loop over all Patches to count how many there are
@@ -1396,24 +1439,23 @@ contains
     !
     ! !ARGUMENTS:
     type(bounds_type)  , intent(in)            :: bounds
-    type(ed_site_type) , intent(inout), target :: ed_allsites_inst( bounds%begg: )
+    type(ed_site_type) , intent(inout), target :: sites(nsites)
+    integer,             intent(in)            :: nsites
     !
     ! !LOCAL VARIABLES:
     type (ed_patch_type), pointer :: currentPatch
-    integer :: g              ! gridcell
     integer :: totNumPatches  ! total number of patches.  
+    integer :: s
     !---------------------------------------------------------------------
 
     totNumPatches = 0
 
-    do g = bounds%begg,bounds%endg
-       if (ed_allsites_inst(g)%istheresoil) then
-          currentPatch => ed_allsites_inst(g)%oldest_patch
-          do while(associated(currentPatch))
-             totNumPatches = totNumPatches + 1
-             currentPatch => currentPatch%younger
-          enddo
-       endif
+    do s = 1,nsites
+       currentPatch => sites(s)%oldest_patch
+       do while(associated(currentPatch))
+          totNumPatches = totNumPatches + 1
+          currentPatch => currentPatch%younger
+       enddo
     enddo
 
    end function countPatches

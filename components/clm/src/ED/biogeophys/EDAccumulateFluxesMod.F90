@@ -20,7 +20,7 @@ module EDAccumulateFluxesMod
 contains
 
   !------------------------------------------------------------------------------
-  subroutine AccumulateFluxes_ED(bounds, p, ed_allsites_inst, photosyns_inst)
+  subroutine AccumulateFluxes_ED(bounds, p, sites, nsites, hsites , photosyns_inst)
     !
     ! !DESCRIPTION:
     ! see above
@@ -36,14 +36,18 @@ contains
     ! !ARGUMENTS    
     type(bounds_type)    , intent(in)            :: bounds  
     integer              , intent(in)            :: p     !patch/'p'
-    type(ed_site_type)   , intent(inout), target :: ed_allsites_inst( bounds%begg: )
+    type(ed_site_type)   , intent(inout), target :: sites(nsites)
+    integer              , intent(in)            :: nsites
+    integer              , intent(in)            :: hsites(bounds%begc:bounds%endc)
+    
     type(photosyns_type) , intent(inout)         :: photosyns_inst
     !
     ! !LOCAL VARIABLES:
     type(ed_cohort_type), pointer  :: currentCohort ! current cohort
     type(ed_patch_type) , pointer  :: currentPatch ! current patch
     integer :: iv !leaf layer
-    integer :: g  !gridcell
+    integer :: c  ! clm/alm column
+    integer :: s  ! ed site
     !----------------------------------------------------------------------
 
     associate(& 
@@ -51,12 +55,19 @@ contains
          psncanopy => photosyns_inst%psncanopy_patch   & ! Output: [real(r8) (:,:)] canopy scale photosynthesis umol CO2 /m**2/ s
          )
 
+
+      ! INTERF-TODO:  WHY IS THIS BEING UPDATED?
+      ! IT IS JUST GOING TO BE ZEROED A THE END OF THE FUNCTION
+      ! THAT CALLS THIS SUBROUTINE (CANOPYFLUXES), AND IT WON'T
+      ! BE USED BETWEEN NOW AND THEN
       fpsn(p) = psncanopy(p)
 
       if (patch%is_veg(p)) then
 
-         g = patch%gridcell(p)
-         currentPatch => map_clmpatch_to_edpatch(ed_allsites_inst(g), p) 
+         c = patch%column(p)
+         s = hsites(c)
+
+         currentPatch => map_clmpatch_to_edpatch(sites(s), p) 
          currentCohort => currentPatch%shortest
 
          do while(associated(currentCohort))

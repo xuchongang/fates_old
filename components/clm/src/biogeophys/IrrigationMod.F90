@@ -89,7 +89,11 @@ module IrrigationMod
      !     (h2osoi_liq_so + irrig_factor*(h2osoi_liq_sat - h2osoi_liq_so)). 
      ! A value of 0 means that the target soil moisture level is h2osoi_liq_so. 
      ! A value of 1 means that the target soil moisture level is h2osoi_liq_sat
-     real(r8) :: irrig_factor = 0.7_r8            
+     real(r8) :: irrig_factor = 0.7_r8  
+     
+     !Determine whether it is drip irrigration or not
+     !For drip irrigation, the water will be applied without runoff
+     logical :: is_drip_irrig   = .false.      
 
   end type irrigation_params_type
 
@@ -100,9 +104,9 @@ module IrrigationMod
      ! Note: these should be treated as read-only by other modules
      real(r8), pointer, public :: qflx_irrig_patch(:) ! patch irrigation flux (mm H2O/s)
      real(r8), pointer, public :: qflx_irrig_col  (:) ! col irrigation flux (mm H2O/s)
+     type(irrigation_params_type),public :: params
 
      ! Private data members; set in initialization:
-     type(irrigation_params_type) :: params
      integer :: dtime                ! land model time step (sec)
      integer :: irrig_nsteps_per_day ! number of time steps per day in which we irrigate
      real(r8), pointer :: relsat_so_patch(:,:) ! relative saturation at which smp = smpso (i.e., full stomatal opening) [patch, nlevgrnd]

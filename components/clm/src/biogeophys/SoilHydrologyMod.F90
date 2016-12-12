@@ -336,6 +336,7 @@ contains
           eff_porosity     =>    soilstate_inst%eff_porosity_col     , & ! Output: [real(r8) (:,:) ]  effective porosity = porosity - vol_ice         
 
           qflx_irrig       =>    irrigation_inst%qflx_irrig_col      , & ! Input:  [real(r8) (:)   ]  irrigation amount (mm/s)  !BOC...added for Chonggang irrigation
+	  is_drip_irrig    =>    irrigation_inst%params%is_drip_irrig, & ! for drip irrigation, the water will be applied without runoff 
 
           h2osfc_thresh    =>    soilhydrology_inst%h2osfc_thresh_col, & ! Input:  [real(r8) (:)   ]  level at which h2osfc "percolates"                
           zwt              =>    soilhydrology_inst%zwt_col          , & ! Input:  [real(r8) (:)   ]  water table depth (m)                             
@@ -476,7 +477,11 @@ contains
              !7. remove drainage from h2osfc and add to qflx_infl
              h2osfc(c) = h2osfc(c) - qflx_h2osfc_drain(c) * dtime
              qflx_infl(c) = qflx_infl(c) + qflx_h2osfc_drain(c)
-             qflx_irrig(c) = min(qflx_irrig(c), (1.0_r8 - frac_h2osfc(c))*qinmax - qflx_infil(c))  !BOC...limit irrigation to prevent runoff
+	     !8. drip irrigration
+	     if(is_drip_irrig)then
+                 qflx_irrig(c) = min(qflx_irrig(c), (1.0_r8 - frac_h2osfc(c))*qinmax - qflx_infl(c))  !BOC...limit irrigation to prevent runoff
+		 qflx_infl(c) = qflx_infl(c) + qflx_irrig(c)
+	     endif
           else
              ! non-vegetated landunits (i.e. urban) use original CLM4 code
              if (snl(c) >= 0) then

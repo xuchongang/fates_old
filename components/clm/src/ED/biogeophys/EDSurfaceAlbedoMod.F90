@@ -867,7 +867,7 @@ contains
                               endif
                            enddo
                         enddo
-                        if (lai_change(1,2,1).gt.0.0.and.lai_change(1,2,2).gt.0.0)then
+!                        if (lai_change(1,2,1).gt.0.0.and.lai_change(1,2,2).gt.0.0)then
 !                           write(iulog,*) 'lai_change(1,2,12)',lai_change(1,2,1:4)
 !                        endif
 !                        if (lai_change(1,2,2).gt.0.0.and.lai_change(1,2,3).gt.0.0)then
@@ -1129,4 +1129,4 @@ end subroutine ED_SunShadeFracs
    
 
 end module EDSurfaceRadiationMod
->>>>>>> 5874a2041b631f72a7a892dc3383520245d24fc2
+

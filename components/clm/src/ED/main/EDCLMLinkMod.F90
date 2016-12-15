@@ -14,6 +14,7 @@ module EDCLMLinkMod
   use EDtypesMod       , only : ed_site_type, ed_cohort_type, ed_patch_type, ncwd
   use EDtypesMod       , only : sclass_ed, nlevsclass_ed, AREA
   use CanopyStateType  , only : canopystate_type
+  use SoilStateType    , only : soilstate_type
   use clm_varctl       , only : use_vertsoilc
   use EDParamsMod      , only : ED_val_ag_biomass
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
@@ -951,7 +952,7 @@ contains
 
   !-----------------------------------------------------------------------
 
-  subroutine ed_clm_link( this, bounds, sites, nsites, fcolumn, waterstate_inst, canopystate_inst)
+  subroutine ed_clm_link( this, bounds, sites, nsites, fcolumn, waterstate_inst, canopystate_inst,soilstate_inst)
     !
     ! !USES: 
     use landunit_varcon      , only : istsoil
@@ -972,6 +973,7 @@ contains
     integer                 , intent(in)            :: fcolumn(nsites)
     type(waterstate_type)   , intent(inout)         :: waterstate_inst
     type(canopystate_type)  , intent(inout)         :: canopystate_inst
+    type(soilstate_type)    , intent(inout)         :: soilstate_inst
     !
     ! !LOCAL VARIABLES:
     type (ed_patch_type)  , pointer :: currentPatch
@@ -1194,19 +1196,22 @@ contains
       end do ! column loop
 
       call this%flux_into_litter_pools(bounds, sites(:), nsites, fcolumn(:), canopystate_inst)
-      call this%ed_update_history_variables(bounds, sites(:), nsites, fcolumn(:), canopystate_inst)
+      call this%ed_update_history_variables(bounds, sites(:), nsites, fcolumn(:), canopystate_inst, soilstate_inst)
       
     end associate
 
   end subroutine ed_clm_link
 
   !-----------------------------------------------------------------------
-  subroutine ed_update_history_variables( this, bounds, sites, nsites, fcolumn, canopystate_inst)
+  subroutine ed_update_history_variables( this, bounds, sites, nsites, fcolumn, canopystate_inst,soilstate_inst)
     !
     ! !USES: 
     use CanopyStateType  , only : canopystate_type
     use PatchType        , only : clmpatch => patch
     use pftconMod        , only : pftcon
+    use clm_varpar       , only : nlevgrnd
+    use EDTypesMod       , only : numpft_ed    
+    
 
     !
     ! !ARGUMENTS:
@@ -1218,6 +1223,7 @@ contains
     type(ed_patch_type)     , pointer               :: currentPatch
     type(ed_cohort_type)    , pointer               :: currentCohort
     type(canopystate_type)  , intent(inout)         :: canopystate_inst
+    type(soilstate_type)    , intent(inout)         :: soilstate_inst
     !
     ! !LOCAL VARIABLES:
     integer  :: p,ft,c,s
@@ -1228,6 +1234,7 @@ contains
     real(r8) :: dbh         ! actual dbh used to identify relevant size class
     integer  :: scpf        ! size class x pft index
     integer  :: sc
+    integer  :: j              
     !-----------------------------------------------------------------------
 
     associate(                                                           &
@@ -1291,6 +1298,7 @@ contains
          elai                 => canopystate_inst%elai_patch     , & ! InOut:
          tsai                 => canopystate_inst%tsai_patch     , & ! InOut:
          esai                 => canopystate_inst%esai_patch     , & ! InOut:
+	 rootfr               => soilstate_inst%rootfr_patch     , &
 
          begp                 => bounds%begp                     , &
          endp                 => bounds%endp                       &
@@ -1544,6 +1552,10 @@ contains
                seed_germination(p)     = sum(currentPatch%seed_germination) * 1.e3_r8 * 365.0_r8 * SHR_CONST_CDAY * patch_scaling_scalar
                canopy_spread(p)        = currentPatch%spread(1) 
                area_plant(p)           = 1._r8
+	       do j = 1,nlevgrnd
+	           rootfr(p,j)         = sum(currentPatch%rootfr_ft(:,j))/numpft_ed 
+	       enddo
+	        
                if (min(currentPatch%total_canopy_area,currentPatch%area)>0.0_r8) then
                   area_trees(p)           = currentPatch%total_tree_area   / min(currentPatch%total_canopy_area,currentPatch%area)
                else

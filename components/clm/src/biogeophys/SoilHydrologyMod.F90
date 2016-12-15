@@ -478,8 +478,8 @@ contains
              h2osfc(c) = h2osfc(c) - qflx_h2osfc_drain(c) * dtime
              qflx_infl(c) = qflx_infl(c) + qflx_h2osfc_drain(c)
 	     !8. drip irrigration
-	     if(is_drip_irrig)then
-                 qflx_irrig(c) = min(qflx_irrig(c), (1.0_r8 - frac_h2osfc(c))*qinmax - qflx_infl(c))  !BOC...limit irrigation to prevent runoff
+	     if(is_drip_irrig.and.qflx_irrig(c)>0.0)then
+                 qflx_irrig(c) = min(qflx_irrig(c), (1.0_r8 - frac_h2osfc(c))*qinmax - max(0.0_r8,qflx_infl(c)))  !BOC...limit irrigation to prevent runoff,qflx_infl could be negative
 		 qflx_infl(c) = qflx_infl(c) + qflx_irrig(c)
 	     endif
           else

@@ -393,7 +393,7 @@ contains
       class(hlm_fates_interface_type), intent(inout) :: this
       type(bounds_type),intent(in)                   :: bounds_clump
       type(atm2lnd_type)      , intent(in)           :: atm2lnd_inst
-      type(soilstate_type)    , intent(in)           :: soilstate_inst
+      type(soilstate_type)    , intent(inout)        :: soilstate_inst
       type(temperature_type)  , intent(in)           :: temperature_inst
       integer                 , intent(in)           :: nc
       type(waterstate_type)   , intent(inout)        :: waterstate_inst
@@ -466,7 +466,8 @@ contains
             this%fates(nc)%nsites,                                 &
             this%f2hmap(nc)%fcolumn,                               &
             waterstate_inst,                                       &
-            canopystate_inst)
+            canopystate_inst,                                      &
+	    soilstate_inst)
 
 
       if (masterproc) then
@@ -481,7 +482,7 @@ contains
 
    ! ------------------------------------------------------------------------------------
 
-   subroutine init_restart(this, ncid, flag, waterstate_inst, canopystate_inst )
+   subroutine init_restart(this, ncid, flag, waterstate_inst, canopystate_inst,soilstate_inst )
 
       implicit none
 
@@ -491,7 +492,7 @@ contains
       character(len=*)               , intent(in)    :: flag    !'read' or 'write'
       type(waterstate_type)          , intent(inout) :: waterstate_inst
       type(canopystate_type)         , intent(inout) :: canopystate_inst
-
+      type(soilstate_type)           , intent(inout) :: soilstate_inst
       ! Locals
       type(bounds_type) :: bounds_clump
       integer           :: nc
@@ -514,7 +515,8 @@ contains
                     this%fates(nc)%nsites,                                         &
                     this%f2hmap(nc)%fcolumn,                                       &
                     waterstate_inst,                                               &
-                    canopystate_inst)
+                    canopystate_inst,                                              &
+		    soilstate_inst)
                
 
             end if
@@ -528,12 +530,13 @@ contains
 
    ! ====================================================================================
 
-   subroutine init_coldstart(this, waterstate_inst, canopystate_inst)
+   subroutine init_coldstart(this, waterstate_inst, canopystate_inst,soilstate_inst)
 
      ! Arguments
      class(hlm_fates_interface_type), intent(inout) :: this
      type(waterstate_type)          , intent(inout) :: waterstate_inst
      type(canopystate_type)         , intent(inout) :: canopystate_inst
+     type(soilstate_type)           , intent(inout) :: soilstate_inst
 
      ! locals
      integer                                        :: nclumps
@@ -577,7 +580,8 @@ contains
                 this%fates(nc)%nsites,                              &
                 this%f2hmap(nc)%fcolumn,                            &
                 waterstate_inst,                                    &
-                canopystate_inst)
+                canopystate_inst,                                   &
+		soilstate_inst)
         end if
      end do
      return

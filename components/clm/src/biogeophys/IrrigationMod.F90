@@ -46,6 +46,7 @@ module IrrigationMod
   use shr_kind_mod     , only : r8 => shr_kind_r8
   use decompMod        , only : bounds_type, get_proc_global
   use shr_log_mod      , only : errMsg => shr_log_errMsg
+  use shr_infnan_mod   , only : nan => shr_infnan_nan, assignment(=)
   use clm_varcon       , only : isecspday, degpsec, denh2o, spval
   use clm_varpar       , only : nlevgrnd
   use clm_time_manager , only : get_step_size
@@ -601,15 +602,17 @@ contains
     ! (Note: frozen_soil could probably be a column-level variable, but that would be
     ! slightly less robust to potential future modifications)
     frozen_soil(bounds%begp : bounds%endp) = .false.
-    do j = 1,nlevgrnd
-       do f = 1, num_exposedvegp
+    if(elai(p) > this%params%irrig_min_lai .and. &    !check for irrigration criteria
+        btran(p) < this%params%irrig_btran_thresh) then 
+      do j = 1,nlevgrnd
+        do f = 1, num_exposedvegp
           p = filter_exposedvegp(f)
           c = patch%column(p)
           if (check_for_irrig(p) .and. .not. frozen_soil(p)) then
              ! if level L was frozen, then we don't look at any levels below L
              if (t_soisno(c,j) <= SHR_CONST_TKFRZ) then
                 frozen_soil(p) = .true.
-             else if (rootfr(p,j) > 0._r8) then
+             else if (.not.isnan(rootfr(p,j)).and.rootfr(p,j) > 0._r8) then
                 deficit = this%IrrigationDeficit( &
                      relsat_so  = this%relsat_so_patch(p,j), &
                      h2osoi_liq = h2osoi_liq(c,j), &
@@ -621,10 +624,11 @@ contains
                 this%irrig_rate_patch(p)  = this%irrig_rate_patch(p) + &
                      deficit/(this%dtime*this%irrig_nsteps_per_day)
 
-             end if  ! else if (rootfr(p,j) > 0)
-          end if     ! if (check_for_irrig(p) .and. .not. frozen_soil(p))
-       end do        ! do f
-    end do           ! do j
+              end if  ! else if (rootfr(p,j) > 0)
+           end if     ! if (check_for_irrig(p) .and. .not. frozen_soil(p))
+        end do        ! do f
+      end do           ! do j
+    end if !irrigation criteria
 
 
   end subroutine CalcIrrigationNeeded
@@ -658,9 +662,11 @@ contains
     character(len=*), parameter :: subname = 'PointNeedsCheckForIrrig'
     !-----------------------------------------------------------------------
     
-    if (pftcon%irrigated(pft_type) == 1._r8 .and. &
-         elai > this%params%irrig_min_lai .and. &
-         btran < this%params%irrig_btran_thresh) then
+    !if (pftcon%irrigated(pft_type) == 1._r8 .and. &  !comment out by chonggang to turn off irrigation even if the 
+    !     elai > this%params%irrig_min_lai .and. &    !irrigration criteria is not met
+    !     btran < this%params%irrig_btran_thresh) then
+       ! see if it's the right time of day to start irrigating:
+    if (pftcon%irrigated(pft_type) == 1._r8)then
        ! see if it's the right time of day to start irrigating:
        local_time = modulo(time_prev + nint(londeg/degpsec), isecspday)
        seconds_since_irrig_start_time = modulo(local_time - this%params%irrig_start_time, isecspday)

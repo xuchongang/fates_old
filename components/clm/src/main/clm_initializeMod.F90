@@ -688,7 +688,7 @@ contains
    
     if ( use_ed .and. .not.is_restart() ) then
 
-       call clm_fates%init_coldstart(waterstate_inst,canopystate_inst)
+       call clm_fates%init_coldstart(waterstate_inst,canopystate_inst,soilstate_inst)
        
     end if
 

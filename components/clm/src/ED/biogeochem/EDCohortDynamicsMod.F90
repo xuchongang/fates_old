@@ -4,14 +4,18 @@ module EDCohortDynamicsMod
   ! Cohort stuctures in ED. 
   !
   ! !USES: 
-  use shr_kind_mod          , only : r8 => shr_kind_r8;
-  use clm_varctl            , only : iulog 
+  use abortutils            , only : endrun
+  use FatesGlobals          , only : fates_log
+  use FatesGlobals          , only : freq_day
+  use FatesConstantsMod     , only : r8 => fates_r8
+  use FatesConstantsMod     , only : fates_unset_int
+  use shr_log_mod           , only : errMsg => shr_log_errMsg
   use pftconMod             , only : pftcon
   use EDEcophysContype      , only : EDecophyscon
   use EDGrowthFunctionsMod  , only : c_area, tree_lai
   use EDTypesMod            , only : ed_site_type, ed_patch_type, ed_cohort_type
-  use EDTypesMod            , only : fusetol, nclmax
-  use EDtypesMod            , only : ncwd, numcohortsperpatch, udata
+  use EDTypesMod            , only : fusetol, cp_nclmax
+  use EDtypesMod            , only : ncwd, maxcohortsperpatch
   use EDtypesMod            , only : sclass_ed,nlevsclass_ed,AREA
   use EDtypesMod            , only : min_npm2, min_nppatch, min_n_safemath
   !
@@ -27,10 +31,13 @@ module EDCohortDynamicsMod
   public :: sort_cohorts
   public :: copy_cohort
   public :: count_cohorts
-!  public :: countCohorts
+  public :: size_and_type_class_index
   public :: allocate_live_biomass
 
   logical, parameter :: DEBUG  = .false. ! local debug flag
+
+  character(len=*), parameter, private :: sourcefile = &
+       __FILE__
 
   ! 10/30/09: Created by Rosie Fisher
   !-------------------------------------------------------------------------------------!
@@ -68,7 +75,6 @@ contains
     !----------------------------------------------------------------------
 
     allocate(new_cohort)
-    udata%cohort_number = udata%cohort_number + 1  !give each cohort a unique number for checking cohort fusing routine.
 
     call nan_cohort(new_cohort)  ! Make everything in the cohort not-a-number
     call zero_cohort(new_cohort) ! Zero things that need to be zeroed. 
@@ -77,7 +83,8 @@ contains
     ! Define cohort state variable
     !**********************/
  
-    new_cohort%indexnumber  = udata%cohort_number
+    new_cohort%indexnumber  = fates_unset_int ! Cohort indexing was not thread-safe, setting
+                                              ! bogus value for the time being (RGK-012017)
     new_cohort%siteptr      => patchptr%siteptr
     new_cohort%patchptr     => patchptr
     new_cohort%pft          = pft     
@@ -92,13 +99,21 @@ contains
     new_cohort%balive       = balive
     new_cohort%bstore       = bstore
 
-    if ( DEBUG ) write(iulog,*) 'EDCohortDyn I ',bstore
+    call size_and_type_class_index(new_cohort%dbh,new_cohort%pft, &
+                                   new_cohort%size_class,new_cohort%size_by_pft_class)
 
-    if (new_cohort%dbh <= 0.0_r8 .or. new_cohort%n == 0._r8 .or. new_cohort%pft == 0 &
-          .or. new_cohort%canopy_trim <= 0.0_r8 .or. new_cohort%balive <= 0._r8) then
-             write(iulog,*) 'ED: something is zero in create_cohort', &
-                             new_cohort%indexnumber,new_cohort%dbh,new_cohort%n, &
-                             new_cohort%pft,new_cohort%canopy_trim,new_cohort%balive
+    if ( DEBUG ) write(fates_log(),*) 'EDCohortDyn I ',bstore
+
+    ! This routine may be called during restarts, and at this point in the call sequence
+    ! the actual cohort data is unknown, as this is really only used for allocation
+    ! In these cases, testing if things like biomass are reasonable is pre-mature
+    ! However, in this part of the code, we will pass in nominal values for size, number and type
+    
+    if (new_cohort%dbh <= 0.0_r8 .or. new_cohort%n == 0._r8 .or. new_cohort%pft == 0 ) then
+             write(fates_log(),*) 'ED: something is zero in create_cohort', &
+                             new_cohort%dbh,new_cohort%n, &
+                             new_cohort%pft
+             call endrun(msg=errMsg(sourcefile, __LINE__))
     endif
 
     if (new_cohort%siteptr%status==2 .and. pftcon%season_decid(pft) == 1) then
@@ -171,6 +186,9 @@ contains
                               ! accounts for the fact that live biomass may decline in the off-season, 
                               ! making leaf_memory unrealistic.    
     real(r8)  :: ratio_balive ! ratio between root+shoot biomass now and root+shoot biomass when leaves fell off. 
+    real(r8)  :: new_bl
+    real(r8)  :: new_br
+    real(r8)  :: new_bsw
                                             
     integer   :: ft           ! functional type
     integer   :: leaves_off_switch
@@ -205,77 +223,78 @@ contains
     ! Use different proportions if the leaves are on vs off
     if(leaves_off_switch==0)then
 
-       ! Tracking npp/gpp diagnostics only occur after growth derivatives is called
-       if(mode==1)then
-          ! it will not be able to put out as many leaves as it had previous timestep
-          currentcohort%npp_leaf = currentcohort%npp_leaf + &
-                max(0.0_r8,currentcohort%balive*leaf_frac - currentcohort%bl)/udata%deltat
-       end if
 
-       currentcohort%bl = currentcohort%balive*leaf_frac
+       new_bl = currentcohort%balive*leaf_frac
+
+       new_br = pftcon%froot_leaf(ft) * (currentcohort%balive + currentcohort%laimemory) * leaf_frac
+
+       new_bsw = EDecophyscon%sapwood_ratio(ft) * currentcohort%hite *(currentcohort%balive + &
+            currentcohort%laimemory)*leaf_frac
 
        !diagnose the root and stem biomass from the functional balance hypothesis. This is used when the leaves are 
        !fully on. 
-       if(mode==1)then
+       if(mode==1)then 
 
+          currentcohort%npp_leaf = currentcohort%npp_leaf + &
+                max(0.0_r8,new_bl - currentcohort%bl) / freq_day
+          
           currentcohort%npp_froot = currentcohort%npp_froot + &
-                max(0._r8,pftcon%froot_leaf(ft)*(currentcohort%balive+currentcohort%laimemory)*leaf_frac - currentcohort%br)/udata%deltat
+                max(0._r8,new_br - currentcohort%br) / freq_day
 
-          currentcohort%npp_bsw = max(0._r8,EDecophyscon%sapwood_ratio(ft) * currentcohort%hite *(currentcohort%balive + &
-                currentcohort%laimemory)*leaf_frac - currentcohort%bsw)/udata%deltat
+          currentcohort%npp_bsw =  max(0.0_r8, new_bsw - currentcohort%bsw)/freq_day
 
           currentcohort%npp_bdead =  currentCohort%dbdeaddt
 
        end if
-
-       currentcohort%br  = pftcon%froot_leaf(ft) * (currentcohort%balive + currentcohort%laimemory) * leaf_frac
-       currentcohort%bsw = EDecophyscon%sapwood_ratio(ft) * currentcohort%hite *(currentcohort%balive + &
-            currentcohort%laimemory)*leaf_frac
-
-	    
-    else ! Leaves are on (leaves_off_switch==1)
-
-    !the purpose of this section is to figure out the root and stem biomass when the leaves are off
-    !at this point, we know the former leaf mass (laimemory) and the current alive mass
-    !because balive may decline in the off-season, we need to adjust the root and stem biomass that are predicted
-    !from the laimemory, for the fact that we now might not have enough live biomass to support the hypothesized root mass
-    !thus, we use 'ratio_balive' to adjust br and bsw. Apologies that this is so complicated! RF
+       
+       currentcohort%bl = new_bl
+       currentcohort%br = new_br
+       currentcohort%bsw = new_bsw
 
 
-       currentcohort%bl  = 0.0_r8
+    else ! Leaves are off (leaves_off_switch==1)
+
+       !the purpose of this section is to figure out the root and stem biomass when the leaves are off
+       !at this point, we know the former leaf mass (laimemory) and the current alive mass
+       !because balive may decline in the off-season, we need to adjust the 
+       !root and stem biomass that are predicted from the laimemory, for the fact that we now might 
+       !not have enough live biomass to support the hypothesized root mass
+       !thus, we use 'ratio_balive' to adjust br and bsw. Apologies that this is so complicated! RF
+       
        ideal_balive      = currentcohort%laimemory * pftcon%froot_leaf(ft) +  &
             currentcohort%laimemory*  EDecophyscon%sapwood_ratio(ft) * currentcohort%hite
-       currentcohort%br  = pftcon%froot_leaf(ft) * (ideal_balive + currentcohort%laimemory) * leaf_frac
-       currentcohort%bsw = EDecophyscon%sapwood_ratio(ft) * currentcohort%hite *(ideal_balive + &
-            currentcohort%laimemory)*leaf_frac 
-     
-       ratio_balive           = currentcohort%balive / ideal_balive
-       currentcohort%br       = currentcohort%br  * ratio_balive
-       currentcohort%bsw      = currentcohort%bsw * ratio_balive
+       ratio_balive      = currentcohort%balive / ideal_balive
+
+       new_br  = pftcon%froot_leaf(ft) * (ideal_balive + currentcohort%laimemory) * &
+             leaf_frac *  ratio_balive
+       new_bsw = EDecophyscon%sapwood_ratio(ft) * currentcohort%hite * &
+             (ideal_balive + currentcohort%laimemory) * leaf_frac * ratio_balive
 
        ! Diagnostics
        if(mode==1)then
 
           currentcohort%npp_froot = currentcohort%npp_froot + &
-                max(0.0_r8,pftcon%froot_leaf(ft)*(ideal_balive + &
-                currentcohort%laimemory)*leaf_frac*ratio_balive-currentcohort%br)/udata%deltat
+                max(0.0_r8,new_br-currentcohort%br)/freq_day
 
-          currentcohort%npp_bsw = max(0.0_r8,EDecophyscon%sapwood_ratio(ft) * currentcohort%hite *(ideal_balive + &
-                currentcohort%laimemory)*leaf_frac*ratio_balive - currentcohort%bsw)/udata%deltat
+          currentcohort%npp_bsw = max(0.0_r8, new_bsw-currentcohort%bsw)/freq_day
 
           currentcohort%npp_bdead =  currentCohort%dbdeaddt
 
        end if
 
+       currentcohort%bl  = 0.0_r8
+       currentcohort%br  = new_br
+       currentcohort%bsw = new_bsw
+
     endif
     
     if (abs(currentcohort%balive -currentcohort%bl- currentcohort%br - currentcohort%bsw)>1e-12) then
-       write(iulog,*) 'issue with carbon allocation in create_cohort,allocate_live_biomass',&
+       write(fates_log(),*) 'issue with carbon allocation in create_cohort,allocate_live_biomass',&
             currentcohort%balive -currentcohort%bl- currentcohort%br - currentcohort%bsw, &
             currentcohort%status_coh,currentcohort%balive
-       write(iulog,*) 'actual vs predicted balive',ideal_balive,currentcohort%balive ,ratio_balive,leaf_frac
-       write(iulog,*) 'leaf,root,stem',currentcohort%bl,currentcohort%br,currentcohort%bsw
-       write(iulog,*) 'pft',ft,pftcon%evergreen(ft),pftcon%season_decid(ft),leaves_off_switch
+       write(fates_log(),*) 'actual vs predicted balive',ideal_balive,currentcohort%balive ,ratio_balive,leaf_frac
+       write(fates_log(),*) 'leaf,root,stem',currentcohort%bl,currentcohort%br,currentcohort%bsw
+       write(fates_log(),*) 'pft',ft,pftcon%evergreen(ft),pftcon%season_decid(ft),leaves_off_switch
     endif
     currentCohort%b   = currentCohort%bdead + currentCohort%balive
 
@@ -289,6 +308,8 @@ contains
     !
     ! !USES:
     use shr_infnan_mod, only : nan => shr_infnan_nan, assignment(=)  
+    use FatesConstantsMod, only : fates_unset_int
+
     !
     ! !ARGUMENTS    
     type (ed_cohort_type), intent(inout), target  :: cc_p
@@ -310,11 +331,13 @@ contains
     nullify(currentCohort%siteptr) 
 
     ! VEGETATION STRUCTURE
-    currentCohort%pft                = 999 ! pft number                           
-    currentCohort%indexnumber        = 999 ! unique number for each cohort. (within clump?)
-    currentCohort%canopy_layer       = 999 ! canopy status of cohort (1 = canopy, 2 = understorey, etc.)   
-    currentCohort%NV                 = 999 ! Number of leaf layers: -
-    currentCohort%status_coh         = 999 ! growth status of plant  (2 = leaves on , 1 = leaves off)
+    currentCohort%pft                = fates_unset_int  ! pft number                           
+    currentCohort%indexnumber        = fates_unset_int  ! unique number for each cohort. (within clump?)
+    currentCohort%canopy_layer       = fates_unset_int  ! canopy status of cohort (1 = canopy, 2 = understorey, etc.)   
+    currentCohort%NV                 = fates_unset_int  ! Number of leaf layers: -
+    currentCohort%status_coh         = fates_unset_int  ! growth status of plant  (2 = leaves on , 1 = leaves off)
+    currentCohort%size_class         = fates_unset_int  ! size class index
+    currentCohort%size_by_pft_class  = fates_unset_int  ! size by pft classification index
 
     currentCohort%n                  = nan ! number of individuals in cohort per 'area' (10000m2 default)     
     currentCohort%dbh                = nan ! 'diameter at breast height' in cm                            
@@ -339,16 +362,16 @@ contains
     currentCohort%treesai            = nan ! stem area index of tree (total stem area (m2) / canopy area (m2)
 
     ! CARBON FLUXES 
-    currentCohort%gpp                = nan ! GPP:  kgC/indiv/year
-    currentCohort%gpp_clm            = nan ! GPP:  kgC/indiv/timestep
+    currentCohort%gpp_acc_hold       = nan ! GPP:  kgC/indiv/year
+    currentCohort%gpp_tstep          = nan ! GPP:  kgC/indiv/timestep
     currentCohort%gpp_acc            = nan ! GPP:  kgC/indiv/day         
-    currentCohort%npp                = nan ! NPP:  kgC/indiv/year
-    currentCohort%npp_clm            = nan ! NPP:  kGC/indiv/timestep
+    currentCohort%npp_acc_hold       = nan ! NPP:  kgC/indiv/year
+    currentCohort%npp_tstep          = nan ! NPP:  kGC/indiv/timestep
     currentCohort%npp_acc            = nan ! NPP:  kgC/indiv/day  
     currentCohort%year_net_uptake(:) = nan ! Net uptake of individual leaf layers kgC/m2/year
     currentCohort%ts_net_uptake(:)   = nan ! Net uptake of individual leaf layers kgC/m2/s
-    currentCohort%resp               = nan ! RESP: kgC/indiv/year
-    currentCohort%resp_clm           = nan ! RESP: kgC/indiv/timestep
+    currentCohort%resp_acc_hold      = nan ! RESP: kgC/indiv/year
+    currentCohort%resp_tstep         = nan ! RESP: kgC/indiv/timestep
     currentCohort%resp_acc           = nan ! RESP: kGC/cohort/day
 
     currentCohort%npp_leaf  = nan
@@ -360,7 +383,7 @@ contains
 
 
     !RESPIRATION
-    currentCohort%rd                 = nan
+    currentCohort%rdark              = nan
     currentCohort%resp_m             = nan ! Maintenance respiration.  kGC/cohort/year
     currentCohort%resp_g             = nan ! Growth respiration.       kGC/cohort/year
     currentCohort%livestem_mr        = nan ! Live stem maintenance respiration. kgC/indiv/s-1 
@@ -379,11 +402,6 @@ contains
     currentCohort%treesai            = nan ! stem area index of tree (total stem area (m2) / canopy area (m2)
     currentCohort%leaf_litter        = nan ! leaf litter from phenology: KgC/m2
     currentCohort%woody_turnover     = nan ! amount of wood lost each day: kgC/indiv/year. Currently set to zero.
-
-    ! NITROGEN POOLS      
-    currentCohort%livestemn          = nan ! live stem nitrogen       : KgN/invid
-    currentCohort%livecrootn         = nan ! live coarse root nitrogen: KgN/invid
-    currentCohort%frootn             = nan ! fine root  nitrogen      : KgN/invid
 
     ! VARIABLES NEEDED FOR INTEGRATION 
     currentCohort%dndt               = nan ! time derivative of cohort size 
@@ -422,7 +440,7 @@ contains
 
     currentCohort%NV                 = 0    
     currentCohort%status_coh         = 0    
-    currentCohort%rd                 = 0._r8
+    currentCohort%rdark              = 0._r8
     currentCohort%resp_m             = 0._r8 
     currentCohort%resp_g             = 0._r8
     currentCohort%livestem_mr        = 0._r8
@@ -432,10 +450,10 @@ contains
     currentcohort%npp_acc            = 0._r8
     currentcohort%gpp_acc            = 0._r8
     currentcohort%resp_acc           = 0._r8
-    currentcohort%npp_clm            = 0._r8
-    currentcohort%gpp_clm            = 0._r8
-    currentcohort%resp_clm           = 0._r8
-    currentcohort%resp               = 0._r8
+    currentcohort%npp_tstep          = 0._r8
+    currentcohort%gpp_tstep          = 0._r8
+    currentcohort%resp_tstep         = 0._r8
+    currentcohort%resp_acc_hold      = 0._r8
     currentcohort%carbon_balance     = 0._r8
     currentcohort%leaf_litter        = 0._r8
     currentcohort%year_net_uptake(:) = 999 ! this needs to be 999, or trimming of new cohorts will break. 
@@ -445,8 +463,8 @@ contains
     currentcohort%md                 = 0._r8
     currentcohort%root_md            = 0._r8
     currentcohort%leaf_md            = 0._r8
-    currentcohort%npp                = 0._r8 
-    currentcohort%gpp                = 0._r8  
+    currentcohort%npp_acc_hold       = 0._r8 
+    currentcohort%gpp_acc_hold       = 0._r8  
     currentcohort%storage_flux       = 0._r8   
     currentcohort%dmort              = 0._r8 
     currentcohort%gscan              = 0._r8 
@@ -493,7 +511,7 @@ contains
        if (currentcohort%n <  min_n_safemath) then
          terminate = 1
 	 if ( DEBUG ) then
-             write(iulog,*) 'terminating cohorts 0',currentCohort%n/currentPatch%area,currentCohort%dbh
+             write(fates_log(),*) 'terminating cohorts 0',currentCohort%n/currentPatch%area,currentCohort%dbh
          endif
        endif
 
@@ -507,15 +525,15 @@ contains
             terminate = 1
 
             if ( DEBUG ) then
-               write(iulog,*) 'terminating cohorts 1',currentCohort%n/currentPatch%area,currentCohort%dbh
+               write(fates_log(),*) 'terminating cohorts 1',currentCohort%n/currentPatch%area,currentCohort%dbh
             endif
          endif
 
          ! In the third canopy layer
-         if (currentCohort%canopy_layer > NCLMAX) then 
+         if (currentCohort%canopy_layer > cp_nclmax ) then 
            terminate = 1
            if ( DEBUG ) then
-             write(iulog,*) 'terminating cohorts 2', currentCohort%canopy_layer
+             write(fates_log(),*) 'terminating cohorts 2', currentCohort%canopy_layer
            endif
          endif
 
@@ -523,7 +541,7 @@ contains
          if (currentCohort%balive < 1e-10_r8 .or. currentCohort%bstore < 1e-10_r8) then 
             terminate = 1  
             if ( DEBUG ) then
-              write(iulog,*) 'terminating cohorts 3', currentCohort%balive,currentCohort%bstore
+              write(fates_log(),*) 'terminating cohorts 3', currentCohort%balive,currentCohort%bstore
             endif
          endif
 
@@ -531,7 +549,7 @@ contains
          if (currentCohort%balive+currentCohort%bdead+currentCohort%bstore < 0._r8) then
             terminate = 1
             if ( DEBUG ) then
-            write(iulog,*) 'terminating cohorts 4', currentCohort%balive, &
+            write(fates_log(),*) 'terminating cohorts 4', currentCohort%balive, &
                            currentCohort%bstore, currentCohort%bdead, &
                            currentCohort%balive+currentCohort%bdead+&
                            currentCohort%bstore, currentCohort%n
@@ -584,7 +602,7 @@ contains
     ! Join similar cohorts to reduce total number            
     !
     ! !USES:
-    use clm_varpar  , only :  nlevcan_ed
+    use EDTypesMod  , only :  cp_nlevcan
     !
     ! !ARGUMENTS    
     type (ed_patch_type), intent(inout), target :: patchptr
@@ -613,7 +631,7 @@ contains
     iterate = 1
     fusion_took_place = 0   
     currentPatch => patchptr
-    maxcohorts = numCohortsPerPatch
+    maxcohorts = maxCohortsPerPatch
   
     !---------------------------------------------------------------------!
     !  Keep doing this until nocohorts <= maxcohorts                         !
@@ -664,11 +682,11 @@ contains
                          currentCohort%balive    = (currentCohort%n*currentCohort%balive    + nextc%n*nextc%balive)/newn
                          currentCohort%bdead     = (currentCohort%n*currentCohort%bdead     + nextc%n*nextc%bdead)/newn
 
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn I ',currentCohort%bstore
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn I ',currentCohort%bstore
 
                          currentCohort%bstore    = (currentCohort%n*currentCohort%bstore    + nextc%n*nextc%bstore)/newn   
 
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn II ',currentCohort%bstore
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn II ',currentCohort%bstore
 
                          currentCohort%seed_prod = (currentCohort%n*currentCohort%seed_prod + nextc%n*nextc%seed_prod)/newn  
                          currentCohort%root_md   = (currentCohort%n*currentCohort%root_md   + nextc%n*nextc%root_md)/newn   
@@ -686,10 +704,10 @@ contains
                          currentCohort%bsw         = (currentCohort%n*currentCohort%bsw         + nextc%n*nextc%bsw)/newn
                          currentCohort%bl          = (currentCohort%n*currentCohort%bl          + nextc%n*nextc%bl)/newn
 
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn 569 ',currentCohort%br
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn 570 ',currentCohort%n
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn 571 ',nextc%br
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn 572 ',nextc%n
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn 569 ',currentCohort%br
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn 570 ',currentCohort%n
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn 571 ',nextc%br
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn 572 ',nextc%n
 
                          currentCohort%br          = (currentCohort%n*currentCohort%br          + nextc%n*nextc%br)/newn
                          currentCohort%hite        = (currentCohort%n*currentCohort%hite        + nextc%n*nextc%hite)/newn         
@@ -697,18 +715,25 @@ contains
 
                          currentCohort%gpp_acc     = (currentCohort%n*currentCohort%gpp_acc     + nextc%n*nextc%gpp_acc)/newn
 
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn III ',currentCohort%npp_acc
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn IV ',currentCohort%resp_acc
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn III ',currentCohort%npp_acc
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn IV ',currentCohort%resp_acc
 
                          currentCohort%npp_acc     = (currentCohort%n*currentCohort%npp_acc     + nextc%n*nextc%npp_acc)/newn
                          currentCohort%resp_acc    = (currentCohort%n*currentCohort%resp_acc    + nextc%n*nextc%resp_acc)/newn
 
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn V ',currentCohort%npp_acc
-                         if ( DEBUG ) write(iulog,*) 'EDcohortDyn VI ',currentCohort%resp_acc
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn V ',currentCohort%npp_acc
+                         if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn VI ',currentCohort%resp_acc
+                         
+                         currentCohort%resp_acc_hold = &
+                               (currentCohort%n*currentCohort%resp_acc_hold + &
+                               nextc%n*nextc%resp_acc_hold)/newn
+                         currentCohort%npp_acc_hold  = &
+                               (currentCohort%n*currentCohort%npp_acc_hold + &
+                               nextc%n*nextc%npp_acc_hold)/newn
+                         currentCohort%gpp_acc_hold  = &
+                               (currentCohort%n*currentCohort%gpp_acc_hold + &
+                               nextc%n*nextc%gpp_acc_hold)/newn
 
-                         currentCohort%resp        = (currentCohort%n*currentCohort%resp        + nextc%n*nextc%resp)/newn
-                         currentCohort%npp         = (currentCohort%n*currentCohort%npp         + nextc%n*nextc%npp)/newn
-                         currentCohort%gpp         = (currentCohort%n*currentCohort%gpp         + nextc%n*nextc%gpp)/newn
                          currentCohort%canopy_trim = (currentCohort%n*currentCohort%canopy_trim + nextc%n*nextc%canopy_trim)/newn
 			 currentCohort%dmort       = (currentCohort%n*currentCohort%dmort       + nextc%n*nextc%dmort)/newn
                          currentCohort%fire_mort   = (currentCohort%n*currentCohort%fire_mort   + nextc%n*nextc%fire_mort)/newn
@@ -729,7 +754,7 @@ contains
                          currentCohort%npp_bseed = (currentCohort%n*currentCohort%npp_bseed + nextc%n*nextc%npp_bseed)/newn
                          currentCohort%npp_store = (currentCohort%n*currentCohort%npp_store + nextc%n*nextc%npp_store)/newn
 
-                         do i=1, nlevcan_ed     
+                         do i=1, cp_nlevcan     
                             if (currentCohort%year_net_uptake(i) == 999._r8 .or. nextc%year_net_uptake(i) == 999._r8) then
                                currentCohort%year_net_uptake(i) = min(nextc%year_net_uptake(i),currentCohort%year_net_uptake(i))
                             else
@@ -788,7 +813,7 @@ contains
           !---------------------------------------------------------------------!        
           dynamic_fusion_tolerance = dynamic_fusion_tolerance * 1.1_r8
 
-          write(iulog,*) 'maxcohorts exceeded',dynamic_fusion_tolerance
+          write(fates_log(),*) 'maxcohorts exceeded',dynamic_fusion_tolerance
 
        else
           iterate = 0
@@ -986,8 +1011,7 @@ contains
     o => currentCohort
     n => copyc
 
-    udata%cohort_number = udata%cohort_number + 1
-    n%indexnumber       = udata%cohort_number
+    n%indexnumber     = fates_unset_int
     
     ! VEGETATION STRUCTURE
     n%pft             = o%pft
@@ -1014,20 +1038,21 @@ contains
     n%excl_weight     = o%excl_weight               
     n%prom_weight     = o%prom_weight               
 
-    ! CARBON FLUXES 
-    n%gpp             = o%gpp
+    ! CARBON FLUXES
+    n%gpp_acc_hold    = o%gpp_acc_hold
     n%gpp_acc         = o%gpp_acc
-    n%gpp_clm         = o%gpp_clm
-    n%npp             = o%npp
-    n%npp_clm         = o%npp_clm
+    n%gpp_tstep       = o%gpp_tstep
 
-    if ( DEBUG ) write(iulog,*) 'EDcohortDyn Ia ',o%npp_acc
-    if ( DEBUG ) write(iulog,*) 'EDcohortDyn Ib ',o%resp_acc
-
+    n%npp_acc_hold    = o%npp_acc_hold
+    n%npp_tstep       = o%npp_tstep
     n%npp_acc         = o%npp_acc
-    n%resp_clm        = o%resp_clm
+
+    if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn Ia ',o%npp_acc
+    if ( DEBUG ) write(fates_log(),*) 'EDcohortDyn Ib ',o%resp_acc
+
+    n%resp_tstep      = o%resp_tstep
     n%resp_acc        = o%resp_acc
-    n%resp            = o%resp
+    n%resp_acc_hold   = o%resp_acc_hold
     n%year_net_uptake = o%year_net_uptake
     n%ts_net_uptake   = o%ts_net_uptake
 
@@ -1039,18 +1064,13 @@ contains
     n%npp_store      = o%npp_store
 
     !RESPIRATION
-    n%rd              = o%rd
+    n%rdark           = o%rdark
     n%resp_m          = o%resp_m
     n%resp_g          = o%resp_g
     n%livestem_mr     = o%livestem_mr
     n%livecroot_mr    = o%livecroot_mr
     n%froot_mr        = o%froot_mr
  
-    ! NITROGEN POOLS      
-    n%livestemn       = o%livestemn
-    n%livecrootn      = o%livecrootn
-    n%frootn          = o%frootn
-
     ! ALLOCATION
     n%md              = o%md
     n%leaf_md         = o%leaf_md
@@ -1082,7 +1102,7 @@ contains
     n%dbdeaddt        = o%dbdeaddt
     n%dbstoredt       = o%dbstoredt
 
-    if ( DEBUG ) write(iulog,*) 'EDCohortDyn dpstoredt ',o%dbstoredt
+    if ( DEBUG ) write(fates_log(),*) 'EDCohortDyn dpstoredt ',o%dbstoredt
 
     n%storage_flux    = o%storage_flux
 
@@ -1131,10 +1151,32 @@ contains
     enddo
 
     if (backcount /= currentPatch%countcohorts) then
-       write(iulog,*) 'problem with linked list, not symmetrical' 
+       write(fates_log(),*) 'problem with linked list, not symmetrical' 
     endif
 
   end function count_cohorts
+
+  ! =====================================================================================
+
+  subroutine size_and_type_class_index(dbh,pft,size_class,size_by_pft_class)
+    
+    use EDTypesMod, only: sclass_ed
+    use EDTypesMod, only: nlevsclass_ed
+    
+    ! Arguments
+    real(r8),intent(in) :: dbh
+    integer,intent(in)  :: pft
+    integer,intent(out) :: size_class
+    integer,intent(out) :: size_by_pft_class
+    
+    size_class        = count(dbh-sclass_ed.ge.0.0_r8)
+    
+    size_by_pft_class = (pft-1)*nlevsclass_ed+size_class
+
+    return
+  end subroutine size_and_type_class_index
+
+
 
   !-------------------------------------------------------------------------------------!
 !  function countCohorts( bounds, ed_allsites_inst ) result ( totNumCohorts ) 

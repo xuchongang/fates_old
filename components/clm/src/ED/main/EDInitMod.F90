@@ -4,24 +4,19 @@ module EDInitMod
   ! Contains all modules to set up the ED structure. 
   ! ============================================================================
 
-  use shr_kind_mod              , only : r8 => shr_kind_r8;
-  use spmdMod                   , only : masterproc
-  use decompMod                 , only : bounds_type
+  use FatesConstantsMod         , only : r8 => fates_r8
   use abortutils                , only : endrun
-  use clm_varpar                , only : nclmax
-  use clm_varctl                , only : iulog, use_ed_spit_fire 
+  use EDTypesMod                , only : cp_nclmax
+  use FatesGlobals              , only : fates_log
+  use clm_varctl                , only : use_ed_spit_fire 
   use clm_time_manager          , only : is_restart
-  use CanopyStateType           , only : canopystate_type
-  use WaterStateType            , only : waterstate_type
-  use GridcellType              , only : grc
   use pftconMod                 , only : pftcon
   use EDEcophysConType          , only : EDecophyscon
   use EDGrowthFunctionsMod      , only : bdead, bleaf, dbh
   use EDCohortDynamicsMod       , only : create_cohort, fuse_cohorts, sort_cohorts
   use EDPatchDynamicsMod        , only : create_patch
   use EDTypesMod                , only : ed_site_type, ed_patch_type, ed_cohort_type, area
-  use EDTypesMod                , only : cohorts_per_col, ncwd, numpft_ed, udata
-  use EDCLMLinkMod              , only : ed_clm_type
+  use EDTypesMod                , only : cohorts_per_col, ncwd, numpft_ed
 
   implicit none
   private
@@ -31,8 +26,8 @@ module EDInitMod
   public  :: zero_site
   public  :: init_patches
   public  :: set_site_properties
-  
   private :: init_cohorts
+
   ! ============================================================================
 
 contains
@@ -54,14 +49,11 @@ contains
 
     site_in%oldest_patch     => null() ! pointer to oldest patch at the site
     site_in%youngest_patch   => null() ! pointer to yngest patch at the site
-
-    ! INDICES 
-    site_in%lat              = nan
-    site_in%lon              = nan
-
+    
     ! DISTURBANCE
     site_in%disturbance_rate = 0._r8  ! site level disturbance rates from mortality and fire.
     site_in%dist_type        = 0      ! disturbance dist_type id.
+    site_in%total_burn_flux_to_atm = 0._r8 !
 
     ! PHENOLOGY 
     site_in%status           = 0    ! are leaves in this pixel on or off?
@@ -75,14 +67,22 @@ contains
     site_in%dleafoffdate     = 999  ! doy of leaf on drought
     site_in%water_memory(:)  = nan
 
+
+    ! SEED
+    site_in%seed_bank(:)     = 0._r8
+
     ! FIRE 
     site_in%acc_ni           = 0.0_r8     ! daily nesterov index accumulating over time. time unlimited theoretically.
     site_in%frac_burnt       = 0.0_r8     ! burn area read in from external file
 
+    ! BGC Balance Checks
+    site_in%fates_to_bgc_this_ts = 0.0_r8
+    site_in%fates_to_bgc_last_ts = 0.0_r8
+
   end subroutine zero_site
 
   ! ============================================================================
-  subroutine set_site_properties( sites, nsites)
+  subroutine set_site_properties( nsites, sites)
     !
     ! !DESCRIPTION:
     !
@@ -90,8 +90,8 @@ contains
     !
     ! !ARGUMENTS    
 
-    type(ed_site_type) , intent(inout), target :: sites(nsites)
     integer, intent(in)                        :: nsites
+    type(ed_site_type) , intent(inout), target :: sites(nsites)
     !
     ! !LOCAL VARIABLES:
     integer  :: s
@@ -154,13 +154,15 @@ contains
        sites(s)%acc_NI     = acc_NI
        sites(s)%frac_burnt = 0.0_r8
        sites(s)%old_stock  = 0.0_r8
+
+
     end do
 
     return
   end subroutine set_site_properties
 
   ! ============================================================================
-  subroutine init_patches( sites, nsites)
+  subroutine init_patches( nsites, sites)
     !
     ! !DESCRIPTION:
     !initialize patches on new ground
@@ -169,17 +171,16 @@ contains
     use EDParamsMod ,  only : ED_val_maxspread
     !
     ! !ARGUMENTS    
-    type(ed_site_type) , intent(inout), target :: sites(nsites)
     integer, intent(in)                        :: nsites
+    type(ed_site_type) , intent(inout), target :: sites(nsites)
     !
     ! !LOCAL VARIABLES:
     integer  :: s
     real(r8) :: cwd_ag_local(ncwd)
     real(r8) :: cwd_bg_local(ncwd)
-    real(r8) :: spread_local(nclmax)
+    real(r8) :: spread_local(cp_nclmax)
     real(r8) :: leaf_litter_local(numpft_ed)
     real(r8) :: root_litter_local(numpft_ed)
-    real(r8) :: seed_bank_local(numpft_ed)
     real(r8) :: age !notional age of this patch
     type(ed_patch_type), pointer :: newp
     !----------------------------------------------------------------------
@@ -189,7 +190,6 @@ contains
     leaf_litter_local(:) = 0.0_r8
     root_litter_local(:) = 0.0_r8
     spread_local(:)      = ED_val_maxspread
-    seed_bank_local(:)   = 0.0_r8 !Note (mv,11-04-2014, this is a bug fix - this line was missing)
     age                  = 0.0_r8
 
     !FIX(SPM,032414) clean this up...inits out of this loop
@@ -208,7 +208,7 @@ contains
        ! make new patch...
        call create_patch(sites(s), newp, age, AREA, &
             spread_local, cwd_ag_local, cwd_bg_local, leaf_litter_local,  &
-            root_litter_local, seed_bank_local) 
+            root_litter_local) 
        
        call init_cohorts(newp)
 
@@ -277,7 +277,7 @@ contains
           cstatus = patch_in%siteptr%dstatus
        endif
 
-       if ( DEBUG ) write(iulog,*) 'EDInitMod.F90 call create_cohort '
+       if ( DEBUG ) write(fates_log(),*) 'EDInitMod.F90 call create_cohort '
 
        call create_cohort(patch_in, pft, temp_cohort%n, temp_cohort%hite, temp_cohort%dbh, &
             temp_cohort%balive, temp_cohort%bdead, temp_cohort%bstore, &

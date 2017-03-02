@@ -24,7 +24,7 @@ module SoilBiogeochemDecompCascadeCNMod
   use TemperatureType                    , only : temperature_type 
   use ch4Mod                             , only : ch4_type
   use ColumnType                         , only : col                
-  use EDCLMLinkMod                       , only : cwd_fcel_ed, cwd_flig_ed
+
   !
   implicit none
   private
@@ -60,6 +60,7 @@ module SoilBiogeochemDecompCascadeCNMod
 
      real(r8) :: k_frag_cn      !fragmentation rate for CWD
      real(r8) :: minpsi_cn      !minimum soil water potential for heterotrophic resp
+     real(r8) :: maxpsi_cn      !maximum soil water potential for heterotrophic resp
 
      integer  :: nsompools = 4 
      real(r8), allocatable :: spinup_vector(:) ! multipliers for soil decomp during accelerated spinup
@@ -67,6 +68,9 @@ module SoilBiogeochemDecompCascadeCNMod
   end type params_type
   !
   type(params_type), private :: params_inst
+
+  character(len=*), parameter, private :: sourcefile = &
+       __FILE__
   !-----------------------------------------------------------------------
 
 contains
@@ -103,113 +107,113 @@ contains
     ! Read off of netcdf file
     tString='cn_s1'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cn_s1_cn=tempr
 
     tString='cn_s2'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cn_s2_cn=tempr
 
     tString='cn_s3'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cn_s3_cn=tempr
 
     tString='cn_s4'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cn_s4_cn=tempr
 
     tString='rf_l1s1'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_l1s1_cn=tempr
 
     tString='rf_l2s2'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_l2s2_cn=tempr
 
     tString='rf_l3s3'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_l3s3_cn=tempr
 
     tString='rf_s1s2'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_s1s2_cn=tempr
 
     tString='rf_s2s3'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_s2s3_cn=tempr
 
     tString='rf_s3s4'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%rf_s3s4_cn=tempr
 
     tString='cwd_fcel'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_fcel_cn=tempr
 
     tString='k_l1'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_l1_cn=tempr
 
     tString='k_l2'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_l2_cn=tempr
 
     tString='k_l3'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_l3_cn=tempr
 
     tString='k_s1'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_s1_cn=tempr
 
     tString='k_s2'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_s2_cn=tempr
 
     tString='k_s3'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_s3_cn=tempr
 
     tString='k_s4'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_s4_cn=tempr
 
     tString='k_frag'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%k_frag_cn=tempr
 
     tString='minpsi_hr'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%minpsi_cn=tempr 
+
+    tString='maxpsi_hr'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%maxpsi_cn=tempr 
 
     tString='cwd_flig'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(__FILE__, __LINE__))
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_flig_cn=tempr
-
-    if ( use_ed ) then
-       cwd_fcel_ed = params_inst%cwd_fcel_cn
-       cwd_flig_ed = params_inst%cwd_flig_cn
-    endif
 
   end subroutine readParams
 
@@ -608,7 +612,6 @@ contains
      associate(                                                           &
           dz             => col%dz                                      , & ! Input:  [real(r8) (:,:)   ]  soil layer thickness (m)                               
 
-          sucsat         => soilstate_inst%sucsat_col                   , & ! Input:  [real(r8) (:,:)   ]  minimum soil suction (mm)                              
           soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)          
 
           alt_indx       => canopystate_inst%alt_indx_col               , & ! Input:  [integer  (:)     ]  current depth of thaw                                     
@@ -661,6 +664,7 @@ contains
        k_frag = 1.0_r8-exp(-k_frag*dtd)
 
        minpsi = params_inst%minpsi_cn
+       maxpsi = params_inst%maxpsi_cn
 
        Q10 = CNParamsShareInst%Q10
 
@@ -762,7 +766,6 @@ contains
              do fc = 1,num_soilc
                 c = filter_soilc(fc)
                 if (j==1) w_scalar(c,:) = 0._r8
-                maxpsi = sucsat(c,j) * (-9.8e-6_r8)
                 psi = min(soilpsi(c,j),maxpsi)
                 ! decomp only if soilpsi is higher than minpsi
                 if (psi > minpsi) then
@@ -847,7 +850,6 @@ contains
           do j = 1,nlevdecomp
              do fc = 1,num_soilc
                 c = filter_soilc(fc)
-                maxpsi = sucsat(c,j) * (-9.8e-6_r8)
                 psi = min(soilpsi(c,j),maxpsi)
                 ! decomp only if soilpsi is higher than minpsi
                 if (psi > minpsi) then

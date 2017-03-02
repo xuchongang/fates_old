@@ -73,6 +73,9 @@ module SurfaceRadiationMod
      procedure, private :: InitCold     
 
   end type surfrad_type
+
+  character(len=*), parameter, private :: sourcefile = &
+       __FILE__
   !-----------------------------------------------------------------------
 
 contains
@@ -577,7 +580,9 @@ contains
           fsds_sno_vd     =>    surfrad_inst%fsds_sno_vd_patch    , & ! Output: [real(r8) (:)   ] incident visible, direct radiation on snow (for history files) (patch) [W/m2]
           fsds_sno_nd     =>    surfrad_inst%fsds_sno_nd_patch    , & ! Output: [real(r8) (:)   ] incident near-IR, direct radiation on snow (for history files) (patch) [W/m2]
           fsds_sno_vi     =>    surfrad_inst%fsds_sno_vi_patch    , & ! Output: [real(r8) (:)   ] incident visible, diffuse radiation on snow (for history files) (patch) [W/m2]
-          fsds_sno_ni     =>    surfrad_inst%fsds_sno_ni_patch      & ! Output: [real(r8) (:)   ] incident near-IR, diffuse radiation on snow (for history files) (patch) [W/m2]
+          fsds_sno_ni     =>    surfrad_inst%fsds_sno_ni_patch    ,  & ! Output: [real(r8) (:)   ] incident near-IR, diffuse radiation on snow (for history files) (patch) [W/m2]
+         frac_sno_eff     => waterstate_inst%frac_sno_eff_col          & !Input: 
+  
           )
 
        ! Determine seconds off current time step
@@ -785,7 +790,7 @@ contains
              write(iulog,*)"flx_absin2  = ",sum(flx_absin(c,:))*tri(p,2)
              write(iulog,*)"albgrd_nir  = ",albgrd(c,2)
              write(iulog,*)"coszen      = ",coszen(c)
-             call endrun(decomp_index=c, clmlevel=namec, msg=errmsg(__FILE__, __LINE__))
+             call endrun(decomp_index=c, clmlevel=namec, msg=errmsg(sourcefile, __LINE__))
           endif
 
           ! Diagnostic: shortwave penetrating ground (e.g. top layer)

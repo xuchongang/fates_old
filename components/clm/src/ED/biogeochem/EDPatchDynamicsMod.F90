@@ -7,11 +7,12 @@ module EDPatchDynamicsMod
   use shr_kind_mod         , only : r8 => shr_kind_r8;
   use shr_infnan_mod       , only : nan => shr_infnan_nan, assignment(=)
   use clm_varctl           , only : iulog 
+  use FatesGlobals         , only : freq_day
   use pftconMod            , only : pftcon
   use EDCohortDynamicsMod  , only : fuse_cohorts, sort_cohorts, insert_cohort
-  use EDtypesMod           , only : ncwd, n_dbh_bins, ntol, numpft_ed, area, dbhmax, numPatchesPerCol
-  use EDTypesMod           , only : ed_site_type, ed_patch_type, ed_cohort_type, udata
-  use EDTypesMod           , only : min_patch_area
+  use EDtypesMod           , only : ncwd, n_dbh_bins, ntol, numpft_ed, area, dbhmax, maxPatchesPerCol
+  use EDTypesMod           , only : ed_site_type, ed_patch_type, ed_cohort_type
+  use EDTypesMod           , only : min_patch_area, cp_numlevgrnd, cp_numSWb
   !
   implicit none
   private
@@ -45,7 +46,6 @@ contains
     !
     ! !USES:
     use EDGrowthFunctionsMod , only : c_area, mortality_rates
-    use EDTypesMod           , only : udata
     !
     ! !ARGUMENTS:
     type(ed_site_type) , intent(inout), target :: site_in
@@ -85,7 +85,7 @@ contains
           if(currentCohort%canopy_layer == 1)then
 
              currentPatch%disturbance_rates(1) = currentPatch%disturbance_rates(1) + &
-                  min(1.0_r8,currentCohort%dmort)*udata%deltat*currentCohort%c_area/currentPatch%area
+                  min(1.0_r8,currentCohort%dmort)*freq_day*currentCohort%c_area/currentPatch%area
 
           endif
 
@@ -168,7 +168,7 @@ contains
     ! 10) Area checked, and patchno recalculated. 
     !
     ! !USES:
-    use clm_varpar          , only : nclmax
+    use EDTypesMod          , only : cp_nclmax
     use EDParamsMod         , only : ED_val_maxspread, ED_val_understorey_death
     use EDCohortDynamicsMod , only : zero_cohort, copy_cohort, terminate_cohorts 
     !
@@ -191,8 +191,7 @@ contains
     real(r8) :: leaf_litter_local(numpft_ed) ! initial value of leaf litter. KgC/m2
     real(r8) :: cwd_ag_local(ncwd)           ! initial value of above ground coarse woody debris. KgC/m2
     real(r8) :: cwd_bg_local(ncwd)           ! initial value of below ground coarse woody debris. KgC/m2
-    real(r8) :: seed_bank_local(numpft_ed)   ! initial value of seed bank. KgC/m2
-    real(r8) :: spread_local(nclmax)         ! initial value of canopy spread parameter.no units 
+    real(r8) :: spread_local(cp_nclmax)         ! initial value of canopy spread parameter.no units 
     !---------------------------------------------------------------------
 
     storesmallcohort => null() ! storage of the smallest cohort for insertion routine
@@ -220,17 +219,19 @@ contains
        cwd_bg_local = 0.0_r8
        leaf_litter_local = 0.0_r8
        root_litter_local = 0.0_r8
-       spread_local(1:nclmax) = ED_val_maxspread
+       spread_local(1:cp_nclmax) = ED_val_maxspread
        age = 0.0_r8
-       seed_bank_local = 0.0_r8
 
        allocate(new_patch)
 
-       call zero_patch(new_patch)
+!       This is called inside "create_patch"
+!       create_patch must first allocate some vector spaces before
+!       zero'ing can occur (RGK)
+!       call zero_patch(new_patch)
 
        call create_patch(currentSite, new_patch, age, site_areadis, &
             spread_local, cwd_ag_local, cwd_bg_local, leaf_litter_local, &
-            root_litter_local, seed_bank_local)
+            root_litter_local)
 
        new_patch%tallest  => null()
        new_patch%shortest => null()
@@ -270,7 +271,7 @@ contains
                    ! because this is the part of the original patch where no trees have actually fallen
                    ! The diagnostic cmort,bmort and hmort rates have already been saved         
 
-                   currentCohort%n = currentCohort%n * (1.0_r8 - min(1.0_r8,currentCohort%dmort * udata%deltat))
+                   currentCohort%n = currentCohort%n * (1.0_r8 - min(1.0_r8,currentCohort%dmort * freq_day))
 
                    nc%n = 0.0_r8      ! kill all of the trees who caused the disturbance.         
                    nc%cmort = nan     ! The mortality diagnostics are set to nan because the cohort should dissappear
@@ -297,7 +298,7 @@ contains
                       ! so with the number density must come the effective mortality rates.
 
                       nc%fmort = 0.0_r8               ! Should had also been zero in the donor
-                      nc%imort = ED_val_understorey_death/udata%deltat  ! This was zero in the donor
+                      nc%imort = ED_val_understorey_death/freq_day  ! This was zero in the donor
                       nc%cmort = currentCohort%cmort
                       nc%hmort = currentCohort%hmort
                       nc%bmort = currentCohort%bmort
@@ -335,7 +336,7 @@ contains
                 ! loss of individual from fire in new patch.
                 nc%n = nc%n * (1.0_r8 - currentCohort%fire_mort) 
 
-                nc%fmort = currentCohort%fire_mort/udata%deltat
+                nc%fmort = currentCohort%fire_mort/freq_day
                 nc%imort = 0.0_r8
                 nc%cmort = currentCohort%cmort
                 nc%hmort = currentCohort%hmort
@@ -485,10 +486,6 @@ contains
 
     patch_site_areadis = currentPatch%area * currentPatch%disturbance_rate ! how much land is disturbed in this donor patch? 
  
-    do p=1,numpft_ed
-       newPatch%seed_bank(p) = newPatch%seed_bank(p) + currentPatch%seed_bank(p) * patch_site_areadis/newPatch%area
-    enddo
-
     do c = 1,ncwd !move litter pool en mass into the new patch. 
        newPatch%cwd_ag(c) = newPatch%cwd_ag(c) + currentPatch%cwd_ag(c) * patch_site_areadis/newPatch%area
        newPatch%cwd_bg(c) = newPatch%cwd_bg(c) + currentPatch%cwd_bg(c) * patch_site_areadis/newPatch%area
@@ -719,7 +716,7 @@ contains
              !currentCohort%dmort = mortality_rates(currentCohort) 
              !the disturbance calculations are done with the previous n, c_area and d_mort. So it's probably &
              !not right to recalcualte dmort here.
-             canopy_dead = currentCohort%n * min(1.0_r8,currentCohort%dmort * udata%deltat)
+             canopy_dead = currentCohort%n * min(1.0_r8,currentCohort%dmort * freq_day)
 
              currentPatch%canopy_mortality_woody_litter   = currentPatch%canopy_mortality_woody_litter  + &
                   canopy_dead*(currentCohort%bdead+currentCohort%bsw)
@@ -790,13 +787,12 @@ contains
 
   ! ============================================================================
   subroutine create_patch(currentSite, new_patch, age, areap, spread_local,cwd_ag_local,cwd_bg_local, &
-       leaf_litter_local,root_litter_local,seed_bank_local)
+       leaf_litter_local,root_litter_local)
     !
     ! !DESCRIPTION:
     !  Set default values for creating a new patch
     !
     ! !USES:
-    use clm_varpar      , only : nlevgrnd 
     !
     ! !ARGUMENTS:
     type(ed_site_type) , intent(inout), target :: currentSite
@@ -808,10 +804,20 @@ contains
     real(r8), intent(in) :: root_litter_local(:)! initial value of root litter. KgC/m2
     real(r8), intent(in) :: leaf_litter_local(:)! initial value of leaf litter. KgC/m2
     real(r8), intent(in) :: spread_local(:)     ! initial value of canopy spread parameter.no units 
-    real(r8), intent(in) :: seed_bank_local(:)  ! initial value of seed bank. KgC/m2
     !
     ! !LOCAL VARIABLES:
     !---------------------------------------------------------------------
+
+    allocate(new_patch%tr_soil_dir(cp_numSWb))
+    allocate(new_patch%tr_soil_dif(cp_numSWb))
+    allocate(new_patch%tr_soil_dir_dif(cp_numSWb))
+    allocate(new_patch%fab(cp_numSWb))
+    allocate(new_patch%fabd(cp_numSWb))
+    allocate(new_patch%fabi(cp_numSWb))
+    allocate(new_patch%sabs_dir(cp_numSWb))
+    allocate(new_patch%sabs_dif(cp_numSWb))
+    allocate(new_patch%rootfr_ft(numpft_ed,cp_numlevgrnd))
+    allocate(new_patch%rootr_ft(numpft_ed,cp_numlevgrnd)) 
     
     call zero_patch(new_patch) !The nan value in here is not working??
 
@@ -825,13 +831,13 @@ contains
 
     new_patch%siteptr            => currentSite 
     new_patch%age                = age   
+    new_patch%age_class          = 1
     new_patch%area               = areap 
     new_patch%spread             = spread_local
     new_patch%cwd_ag             = cwd_ag_local
     new_patch%cwd_bg             = cwd_bg_local
     new_patch%leaf_litter        = leaf_litter_local
     new_patch%root_litter        = root_litter_local
-    new_patch%seed_bank          = seed_bank_local
  
     !zeroing things because of the surfacealbedo problem... shouldnt really be necesary
     new_patch%cwd_ag_in(:)       = 0._r8
@@ -861,8 +867,7 @@ contains
     new_patch%leaf_litter_in(:)  = 0._r8
     new_patch%leaf_litter_out(:) = 0._r8
 
-    allocate(new_patch%rootfr_ft(numpft_ed,nlevgrnd))
-    allocate(new_patch%rootr_ft(numpft_ed,nlevgrnd)) 
+   
 
   end subroutine create_patch
 
@@ -895,6 +900,7 @@ contains
     currentPatch%clm_pno  = 999                          
 
     currentPatch%age                        = nan                          
+    currentPatch%age_class                  = 1
     currentPatch%area                       = nan                                           
     currentPatch%canopy_layer_lai(:)        = nan               
     currentPatch%total_canopy_area          = nan
@@ -922,7 +928,6 @@ contains
     currentPatch%tr_soil_dir(:)             = nan    ! fraction of incoming direct  radiation that is transmitted to the soil as direct
     currentPatch%tr_soil_dif(:)             = nan    ! fraction of incoming diffuse radiation that is transmitted to the soil as diffuse
     currentPatch%tr_soil_dir_dif(:)         = nan    ! fraction of incoming direct  radiation that is transmitted to the soil as diffuse
-    currentPatch%fab(:)                     = nan    ! fraction of incoming total   radiation that is absorbed by the canopy
     currentPatch%fabd(:)                    = nan    ! fraction of incoming direct  radiation that is absorbed by the canopy
     currentPatch%fabi(:)                    = nan    ! fraction of incoming diffuse radiation that is absorbed by the canopy
 
@@ -932,10 +937,6 @@ contains
     currentPatch%lai                        = nan    ! leaf area index of patch
     currentPatch%spread(:)                  = nan    ! dynamic ratio of dbh to canopy area.
     currentPatch%pft_agb_profile(:,:)       = nan    
-    currentPatch%gpp                        = 0._r8 
-    currentPatch%npp                        = 0._r8                
-    currentPatch%seed_bank(:)               = 0._r8                    
-    currentPatch%dseed_dt(:)                = 0._r8                    
 
     ! DISTURBANCE 
     currentPatch%disturbance_rates          = 0._r8 
@@ -980,9 +981,11 @@ contains
     currentPatch%btran_ft(:)                = 0.0_r8
 
     currentPatch%canopy_layer_lai(:)        = 0.0_r8
+
     currentPatch%seeds_in(:)                = 0.0_r8
     currentPatch%seed_decay(:)              = 0.0_r8
     currentPatch%seed_germination(:)        = 0.0_r8
+
     currentPatch%fab(:)                     = 0.0_r8
     currentPatch%sabs_dir(:)                = 0.0_r8
     currentPatch%sabs_dif(:)                = 0.0_r8
@@ -997,6 +1000,7 @@ contains
     !  Decide to fuse patches if their cohort structures are similar           
     !
     ! !USES:
+    use EDTypesMod , only : patchfusion_profile_tolerance
     !
     ! !ARGUMENTS:
     type(ed_site_type), intent(inout), target  :: csite
@@ -1014,11 +1018,11 @@ contains
     !---------------------------------------------------------------------
 
     !maxpatch = 4  
-    maxpatch = numPatchesPerCol
+    maxpatch = maxPatchesPerCol
 
     currentSite => csite 
 
-    profiletol = 0.6_r8 !start off with a very small profile tol, or a predefined parameter? 
+    profiletol = patchfusion_profile_tolerance
 
     nopatches = 0
     currentPatch => currentSite%youngest_patch
@@ -1146,6 +1150,7 @@ contains
     ! associated with the secnd patch
     !
     ! !USES:
+    use EDTypesMod, only: ageclass_ed
     !
     ! !ARGUMENTS:
     type (ed_patch_type) , intent(inout), pointer :: dp ! Donor Patch
@@ -1163,11 +1168,11 @@ contains
     type(ed_site_type),  pointer :: csite      ! pointer to the donor patch's site
     !---------------------------------------------------------------------
 
-    !area weighted average of ages & litter & seed bank
+    !area weighted average of ages & litter
     rp%age = (dp%age * dp%area + rp%age * rp%area)/(dp%area + rp%area)  
+    rp%age_class = count(rp%age-ageclass_ed.ge.0.0_r8)
 
     do p = 1,numpft_ed
-       rp%seed_bank(p)        = (rp%seed_bank(p)*rp%area + dp%seed_bank(p)*dp%area)/(rp%area + dp%area)
        rp%seeds_in(p)         = (rp%seeds_in(p)*rp%area + dp%seeds_in(p)*dp%area)/(rp%area + dp%area)
        rp%seed_decay(p)       = (rp%seed_decay(p)*rp%area + dp%seed_decay(p)*dp%area)/(rp%area + dp%area)
        rp%seed_germination(p) = (rp%seed_germination(p)*rp%area + dp%seed_germination(p)*dp%area)/(rp%area + dp%area)
@@ -1243,6 +1248,8 @@ contains
           rp%shortest => storesmallcohort    
 
           currentCohort%patchptr => rp
+          currentCohort%siteptr  => rp%siteptr
+
           currentCohort => nextc
 
           dp%shortest => currentCohort
@@ -1272,6 +1279,7 @@ contains
     end if
 
     ! We have no need for the dp pointer anymore, we have passed on it's legacy
+    call dealloc_patch(dp)
     deallocate(dp)
 
 
@@ -1329,9 +1337,9 @@ contains
             ! This is only really meant for very old patches. 
              if(associated(currentPatch%older) )then
                 write(iulog,*) 'fusing to older patch because this one is too small',currentPatch%area, currentPatch%lai, &
-                     currentPatch%older%area,currentPatch%older%lai,currentPatch%seed_bank(1)
+                     currentPatch%older%area,currentPatch%older%lai
                 call fuse_2_patches(currentPatch%older, currentPatch)
-                write(iulog,*) 'after fusion to older patch',currentPatch%area,currentPatch%seed_bank(1)
+                write(iulog,*) 'after fusion to older patch',currentPatch%area
              else
                 write(iulog,*) 'fusing to younger patch because oldest one is too small',currentPatch%area, currentPatch%lai
                 tmpptr => currentPatch%younger
@@ -1359,6 +1367,46 @@ contains
 
   end subroutine terminate_patches
 
+  ! =====================================================================================
+
+  subroutine dealloc_patch(cpatch)
+
+    ! This Subroutine is intended to de-allocate the allocatable memory that is pointed
+    ! to via the patch structure.  This subroutine DOES NOT deallocate the patch
+    ! structure itself.
+
+    type(ed_patch_type), target :: cpatch
+    type(ed_cohort_type), pointer :: ccohort  ! current
+    type(ed_cohort_type), pointer :: ncohort  ! next
+    
+    ! First Deallocate the cohort space
+    ! -----------------------------------------------------------------------------------
+    ccohort => cpatch%shortest
+    do while(associated(ccohort))
+       
+       ncohort => ccohort%taller
+       deallocate(ccohort)
+       ccohort => ncohort
+
+    end do
+
+    ! Secondly, and lastly, deallocate the allocatable vector spaces in the patch
+    if(allocated(cpatch%tr_soil_dir))then
+       deallocate(cpatch%tr_soil_dir)
+       deallocate(cpatch%tr_soil_dif)
+       deallocate(cpatch%tr_soil_dir_dif)
+       deallocate(cpatch%fab)
+       deallocate(cpatch%fabd)
+       deallocate(cpatch%fabi)
+       deallocate(cpatch%sabs_dir)
+       deallocate(cpatch%sabs_dif)
+       deallocate(cpatch%rootfr_ft)
+       deallocate(cpatch%rootr_ft)
+    end if
+
+    return
+  end subroutine dealloc_patch
+
   ! ============================================================================
   subroutine patch_pft_size_profile(cp_pnt)
     !
@@ -1378,6 +1426,7 @@ contains
     real(r8) :: delta_dbh   ! Size of DBH bin
     integer  :: p    ! Counter for PFT 
     integer  :: j    ! Counter for DBH bins 
+    real(r8), parameter :: gigantictrees = 1.e8_r8
     !---------------------------------------------------------------------
 
     currentPatch => cp_pnt
@@ -1394,6 +1443,9 @@ contains
         if (j == 1) then
            mind(j) = 0.0_r8
            maxd(j) = delta_dbh
+        else if (j == N_DBH_BINS) then
+           mind(j) = (j-1) * delta_dbh
+           maxd(j) = gigantictrees
         else 
            mind(j) = (j-1) * delta_dbh
            maxd(j) = (j)*delta_dbh
@@ -1411,15 +1463,6 @@ contains
           endif
        enddo ! dbh bins
 
-       ! Deal with largest dbh bin
-       j = N_DBH_BINS-1
-       if(currentCohort%dbh  >  j*delta_dbh)then
-
-          currentPatch%pft_agb_profile(currentCohort%pft,j) = currentPatch%pft_agb_profile(currentCohort%pft,j) + &
-               currentCohort%bdead*currentCohort%n/currentPatch%area
-
-       endif !  
-
        currentCohort => currentCohort%taller
 
     enddo !currentCohort 
@@ -1427,7 +1470,7 @@ contains
   end subroutine patch_pft_size_profile
 
   ! ============================================================================
-  function countPatches( bounds, sites, nsites ) result ( totNumPatches ) 
+  function countPatches( bounds, nsites, sites ) result ( totNumPatches ) 
     !
     ! !DESCRIPTION:
     !  Loop over all Patches to count how many there are
@@ -1439,8 +1482,8 @@ contains
     !
     ! !ARGUMENTS:
     type(bounds_type)  , intent(in)            :: bounds
-    type(ed_site_type) , intent(inout), target :: sites(nsites)
     integer,             intent(in)            :: nsites
+    type(ed_site_type) , intent(inout), target :: sites(nsites)
     !
     ! !LOCAL VARIABLES:
     type (ed_patch_type), pointer :: currentPatch

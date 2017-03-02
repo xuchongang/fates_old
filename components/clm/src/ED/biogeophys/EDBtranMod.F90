@@ -11,7 +11,7 @@ module EDBtranMod
                                   ed_patch_type,      &
                                   ed_cohort_type,     &
                                   numpft_ed,          &
-                                  ctrl_parms
+                                  cp_numlevgrnd
    use shr_kind_mod      , only : r8 => shr_kind_r8
    use FatesInterfaceMod , only : bc_in_type, &
                                   bc_out_type
@@ -47,12 +47,12 @@ contains
 
   ! =====================================================================================
   
-  subroutine get_active_suction_layers(sites,nsites,bc_in,bc_out)
+  subroutine get_active_suction_layers(nsites, sites, bc_in, bc_out)
     
     ! Arguments
     
-    type(ed_site_type),intent(inout),target :: sites(nsites)
     integer,intent(in)                      :: nsites
+    type(ed_site_type),intent(inout),target :: sites(nsites)
     type(bc_in_type),intent(in)             :: bc_in(nsites)
     type(bc_out_type),intent(inout)         :: bc_out(nsites)
     
@@ -61,25 +61,21 @@ contains
     integer  :: j                 ! soil layer
     !------------------------------------------------------------------------------
     
-    associate(                                 &
-         numlevgrnd => ctrl_parms%numlevgrnd  )
-      
       do s = 1,nsites
          if (bc_in(s)%filter_btran) then
-            do j = 1,numlevgrnd
+            do j = 1,cp_numlevgrnd
                bc_out(s)%active_suction_gl(j) = check_layer_water( bc_in(s)%h2o_liqvol_gl(j),bc_in(s)%tempk_gl(j) )
             end do
          else
             bc_out(s)%active_suction_gl(:) = .false.
          end if
       end do
-      
-    end associate
+
   end subroutine get_active_suction_layers
   
   ! =====================================================================================
 
-  subroutine btran_ed( sites, nsites, bc_in, bc_out)
+  subroutine btran_ed( nsites, sites, bc_in, bc_out)
       
       ! ---------------------------------------------------------------------------------
       ! Calculate the transpiration wetness function (BTRAN) and the root uptake
@@ -94,8 +90,8 @@ contains
       
       ! Arguments
       
-      type(ed_site_type),intent(inout),target :: sites(nsites)
       integer,intent(in)                      :: nsites
+      type(ed_site_type),intent(inout),target :: sites(nsites)
       type(bc_in_type),intent(in)             :: bc_in(nsites)
       type(bc_out_type),intent(inout)         :: bc_out(nsites)
       
@@ -115,7 +111,6 @@ contains
       !------------------------------------------------------------------------------
       
       associate(                                 &
-            numlevgrnd => ctrl_parms%numlevgrnd , &
             smpsc     => pftcon%smpsc          , &  ! INTERF-TODO: THESE SHOULD BE FATES PARAMETERS
             smpso     => pftcon%smpso            &  ! INTERF-TODO: THESE SHOULD BE FATES PARAMETERS
             )
@@ -133,7 +128,7 @@ contains
               
               do ft = 1,numpft_ed
                  cpatch%btran_ft(ft) = 0.0_r8
-                 do j = 1,numlevgrnd
+                 do j = 1,cp_numlevgrnd
                     
                     ! Calculations are only relevant where liquid water exists
                     ! see clm_fates%wrap_btran for calculation with CLM/ALM
@@ -160,7 +155,7 @@ contains
                  end do !j
                  
                  ! Normalize root resistances to get layer contribution to ET
-                 do j = 1,numlevgrnd    
+                 do j = 1,cp_numlevgrnd    
                     if (cpatch%btran_ft(ft)  >  0.0_r8) then
                        cpatch%rootr_ft(ft,j) = cpatch%rootr_ft(ft,j)/cpatch%btran_ft(ft)
                     else
@@ -184,7 +179,7 @@ contains
               ! pass the host a total transpiration for the patch.  This needs rootr to be
               ! distributed over the soil layers.
               
-              do j = 1,numlevgrnd
+              do j = 1,cp_numlevgrnd
                  bc_out(s)%rootr_pagl(ifp,j) = 0._r8
                  do ft = 1,numpft_ed
                     if(sum(pftgs) > 0._r8)then !prevent problem with the first timestep - might fail
@@ -197,7 +192,7 @@ contains
                     end if
                  enddo
               enddo
-              
+
               !weight patch level output BTRAN for the
               bc_out(s)%btran_pa(ifp) = 0.0_r8
               do ft = 1,numpft_ed
@@ -208,11 +203,12 @@ contains
                     bc_out(s)%btran_pa(ifp)   = bc_out(s)%btran_pa(ifp) + cpatch%btran_ft(ft) * 1./numpft_ed
                  end if
               enddo
-              
-              temprootr = sum(bc_out(s)%rootr_pagl(ifp,:))
+
+              ! While the in-pft root profiles summed to unity, averaging them weighted
+              ! by conductance, or not, will break sum to unity.  Thus, re-normalize.
+              temprootr = sum(bc_out(s)%rootr_pagl(ifp,1:cp_numlevgrnd))
               if(abs(1.0_r8-temprootr) > 1.0e-10_r8 .and. temprootr > 1.0e-10_r8)then
-                 write(iulog,*) 'error with rootr in canopy fluxes',temprootr,sum(pftgs),sum(cpatch%rootr_ft(1:2,:),dim=2)
-                 do j = 1,numlevgrnd
+                 do j = 1,cp_numlevgrnd
                     bc_out(s)%rootr_pagl(ifp,j) = bc_out(s)%rootr_pagl(ifp,j)/temprootr
                  enddo
               end if

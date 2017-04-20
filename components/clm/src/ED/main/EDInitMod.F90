@@ -185,15 +185,15 @@ contains
     type(ed_patch_type), pointer :: newp
     !----------------------------------------------------------------------
 
-    cwd_ag_local(:)      = 0.0_r8 !ED_val_init_litter -- arbitrary value for litter pools. kgC m-2
-    cwd_bg_local(:)      = 0.0_r8 !ED_val_init_litter
+    cwd_ag_local(:)      = 2.0_r8 !ED_val_init_litter -- arbitrary value for litter pools. kgC m-2 !was 0 temp, Liang
+    cwd_bg_local(:)      = 1.0_r8 !ED_val_init_litter !was 0 temp, Liang
     leaf_litter_local(:) = 0.0_r8
     root_litter_local(:) = 0.0_r8
     spread_local(:)      = ED_val_maxspread
-    age                  = 0.0_r8
+    age                  = 80.0_r8 !was 0 temp, Liang
 
     !FIX(SPM,032414) clean this up...inits out of this loop
-    do s = 1, nsites
+    do s = 2, nsites !was 1 temp Liang
 
        allocate(newp)
 
@@ -243,8 +243,8 @@ contains
        allocate(temp_cohort) ! temporary cohort
 
        temp_cohort%pft         = pft
-       temp_cohort%n           = EDecophyscon%initd(pft) * patch_in%area
-       temp_cohort%hite        = EDecophyscon%hgt_min(pft)
+       temp_cohort%n           = 0.5_r8 * 0.001_r8 * patch_in%area !Liang _ EDecophyscon%initd(pft) * patch_in%area
+       temp_cohort%hite        = 14_r8 ! EDecophyscon%hgt_min(pft)
        temp_cohort%dbh         = Dbh(temp_cohort) ! FIX(RF, 090314) - comment out addition of ' + 0.0001_r8*pft   '  - seperate out PFTs a little bit...
        temp_cohort%canopy_trim = 1.0_r8
        temp_cohort%bdead       = Bdead(temp_cohort)
